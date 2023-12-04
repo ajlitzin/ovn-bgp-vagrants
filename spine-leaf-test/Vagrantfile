@@ -112,6 +112,11 @@ if grep -q -i 'cumulus' /etc/lsb-release &> /dev/null; then
             disable_remap
             vagrant_user_nclu
             setup_ztp
+        elif [[ $DISTRIB_RELEASE =~ ^5.* ]]; then
+            echo "  INFO: Detected a 5.x Based Release ($DISTRIB_RELEASE)"
+            disable_remap
+            vagrant_user_nclu
+            setup_ztp
         fi
     fi
 fi
