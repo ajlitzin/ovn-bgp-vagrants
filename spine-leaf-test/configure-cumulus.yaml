@@ -1,0 +1,12 @@
+---
+
+- hosts: all
+  become: yes
+  tasks:
+    - name: Configure interfaces
+      ansible.builtin.template:
+        src: "{{ interfaces_conf_file }}"
+        dest: /etc/network/interfaces
+        validate: ifup -a -s -i %s
+        mode: "0644"
+    #  notify: Apply interface changes

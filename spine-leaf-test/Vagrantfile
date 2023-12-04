@@ -260,6 +260,10 @@ vagrant_interface_rule
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
 
+    device.vm.provision "ansible" do |ansible|
+      ansible.playbook = "configure-cumulus.yaml"
+    end
+
 end
 
   ##### DEFINE VM for spine-2 #####
