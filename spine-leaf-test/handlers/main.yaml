@@ -1,0 +1,37 @@
+---
+
+- name: Apply interface changes
+  become: true
+  ansible.builtin.command: ifreload -a
+
+- name: Restart switchd
+  become: true
+  ansible.builtin.service:
+    name: switchd
+    state: restarted
+
+- name: Reload switchd
+  become: true
+  ansible.builtin.systemd:
+    name: switchd
+    state: reloaded
+
+# This command actually restarts frr. This command will actually drop all
+# routes currently in progress, so this will interrupt networking currently in
+# place.
+- name: Restart frr
+  ansible.builtin.service:
+    name: frr
+    state: restarted
+
+# This is a graceful way of "replacing" the currently running configuration.
+- name: Reload frr
+  ansible.builtin.service:
+    name: frr
+    state: reloaded
+
+- name: Enable frr
+  ansible.builtin.service:
+    name: frr
+    state: started
+    enabled: true
