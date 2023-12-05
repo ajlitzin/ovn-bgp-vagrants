@@ -3,3 +3,6 @@
 lo1_ipv4: 99.98.2.2/32
 swp1_ipv4: 100.64.2.1/30
 swp2_ipv4: 100.64.2.5/30
+
+interfaces_conf_file: "config-files/shared/leafs/etc/network/interfaces"
+frr_conf_file: "config-files/shared/leafs/etc/frr/frr.conf"
