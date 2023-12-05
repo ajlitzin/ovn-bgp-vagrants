@@ -10,3 +10,20 @@
         validate: ifup -a -s -i %s
         mode: "0644"
     #  notify: Apply interface changes
+
+    - name: Configure FRR daemons file
+      ansible.builtin.template:
+        src: "{{ frr_daemons_file }}"
+        dest: /etc/frr/daemons
+        mode: "0640"
+      # notify:
+      #   - Restart frr
+
+    - name: Configure FRR
+      ansible.builtin.template:
+        src: "{{ frr_conf_file }}"
+        dest: /etc/frr/frr.conf
+        validate: vtysh -f %s --dryrun
+        mode: "0640"
+      # notify:
+      #   - Reload frr
