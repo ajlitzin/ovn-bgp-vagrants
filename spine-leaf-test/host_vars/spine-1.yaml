@@ -2,3 +2,4 @@
 
 lo1_ipv4: 99.97.1.1/32
 frr_conf_file: "config-files/shared/spines/etc/frr/frr.conf"
+interfaces_conf_file: "config-files/shared/spines/etc/network/interfaces"
