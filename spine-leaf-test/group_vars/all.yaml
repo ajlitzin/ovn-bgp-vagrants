@@ -1,3 +1,5 @@
+---
+
 interfaces_conf_file: "config-files/{{ inventory_hostname }}/etc/network/interfaces"
 frr_conf_file: "config-files/{{ inventory_hostname }}/etc/frr/frr.conf"
 frr_daemons_file: "config-files/shared/etc/frr/daemons"
