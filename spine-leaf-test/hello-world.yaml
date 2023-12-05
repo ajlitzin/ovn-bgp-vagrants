@@ -1,0 +1,10 @@
+---
+
+# A simple no-op playbook to allow vagrant to call the ansible provisioner
+# and create the inventory file for us
+- hosts: all
+  tasks:
+    - name: Hello World
+      ansible.builtin.debug:
+        msg: "Hello World"
+

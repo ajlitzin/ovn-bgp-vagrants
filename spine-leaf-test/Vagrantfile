@@ -260,8 +260,11 @@ vagrant_interface_rule
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
 
+    # We need Vagrant to run a simple no-op playbook so it will generate an
+    # ansible inventory file for us.  It needs to run for each vm so a
+    # vagrant up updates the IP of the vm in the inventory file
     device.vm.provision "ansible" do |ansible|
-      ansible.playbook = "configure-cumulus.yaml"
+      ansible.playbook = "hello-world.yaml"
     end
 
 end
@@ -384,6 +387,13 @@ vagrant_interface_rule
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
 
+    # We need Vagrant to run a simple no-op playbook so it will generate an
+    # ansible inventory file for us.  It needs to run for each vm so a
+    # vagrant up updates the IP of the vm in the inventory file
+    device.vm.provision "ansible" do |ansible|
+      ansible.playbook = "hello-world.yaml"
+    end
+
 end
 
   ##### DEFINE VM for rack-1-leaf-1 #####
@@ -503,6 +513,13 @@ vagrant_interface_rule
     # Run Any Platform Specific Code and Apply the interface Re-map
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
+
+    # We need Vagrant to run a simple no-op playbook so it will generate an
+    # ansible inventory file for us.  It needs to run for each vm so a
+    # vagrant up updates the IP of the vm in the inventory file
+    device.vm.provision "ansible" do |ansible|
+      ansible.playbook = "hello-world.yaml"
+    end
 
 end
 
@@ -624,6 +641,13 @@ vagrant_interface_rule
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
 
+    # We need Vagrant to run a simple no-op playbook so it will generate an
+    # ansible inventory file for us.  It needs to run for each vm so a
+    # vagrant up updates the IP of the vm in the inventory file
+    device.vm.provision "ansible" do |ansible|
+      ansible.playbook = "hello-world.yaml"
+    end
+
 end
 
   ##### DEFINE VM for rack-2-leaf-1 #####
@@ -743,6 +767,13 @@ vagrant_interface_rule
     # Run Any Platform Specific Code and Apply the interface Re-map
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
+
+    # We need Vagrant to run a simple no-op playbook so it will generate an
+    # ansible inventory file for us.  It needs to run for each vm so a
+    # vagrant up updates the IP of the vm in the inventory file
+    device.vm.provision "ansible" do |ansible|
+      ansible.playbook = "hello-world.yaml"
+    end
 
 end
 
@@ -864,6 +895,13 @@ vagrant_interface_rule
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
 
+    # We need Vagrant to run a simple no-op playbook so it will generate an
+    # ansible inventory file for us.  It needs to run for each vm so a
+    # vagrant up updates the IP of the vm in the inventory file
+    device.vm.provision "ansible" do |ansible|
+      ansible.playbook = "hello-world.yaml"
+    end
+
 end
 
   ##### DEFINE VM for rack-1-host-1 #####
@@ -946,6 +984,13 @@ vagrant_interface_rule
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
 
+    # We need Vagrant to run a simple no-op playbook so it will generate an
+    # ansible inventory file for us.  It needs to run for each vm so a
+    # vagrant up updates the IP of the vm in the inventory file
+    device.vm.provision "ansible" do |ansible|
+      ansible.playbook = "hello-world.yaml"
+    end
+
 end
 
   ##### DEFINE VM for rack-1-host-2 #####
@@ -1026,6 +1071,13 @@ vagrant_interface_rule
     # Run Any Platform Specific Code and Apply the interface Re-map
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
+
+    # We need Vagrant to run a simple no-op playbook so it will generate an
+    # ansible inventory file for us.  It needs to run for each vm so a
+    # vagrant up updates the IP of the vm in the inventory file
+    device.vm.provision "ansible" do |ansible|
+      ansible.playbook = "hello-world.yaml"
+    end
 
 end
 
@@ -1108,6 +1160,13 @@ vagrant_interface_rule
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
 
+    # We need Vagrant to run a simple no-op playbook so it will generate an
+    # ansible inventory file for us.  It needs to run for each vm so a
+    # vagrant up updates the IP of the vm in the inventory file
+    device.vm.provision "ansible" do |ansible|
+      ansible.playbook = "hello-world.yaml"
+    end
+
 end
 
   ##### DEFINE VM for rack-2-host-2 #####
@@ -1188,6 +1247,13 @@ vagrant_interface_rule
     # Run Any Platform Specific Code and Apply the interface Re-map
     #   (may or may not perform a reboot depending on platform)
     device.vm.provision :shell , :inline => $script
+
+    # We need Vagrant to run a simple no-op playbook so it will generate an
+    # ansible inventory file for us.  It needs to run for each vm so a
+    # vagrant up updates the IP of the vm in the inventory file
+    device.vm.provision "ansible" do |ansible|
+      ansible.playbook = "hello-world.yaml"
+    end
 
 end
 
