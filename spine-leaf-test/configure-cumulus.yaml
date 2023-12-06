@@ -1,6 +1,6 @@
 ---
 
-- hosts: all
+- hosts: spine-*,rack-1-leaf*, rack-2-leaf*
   become: true
 
   handlers:
@@ -32,3 +32,36 @@
         mode: "0640"
       notify:
         - Reload frr
+
+- hosts: rack-1-host*
+  gather_facts: false
+  become: true
+
+  handlers:
+    - name: Import re-usable handlers
+      ansible.builtin.import_tasks: "../handlers/main.yaml"
+
+  tasks:
+    - name: Configure FRR
+      ansible.builtin.template:
+        src: "{{ frr_conf_file }}"
+        dest: /etc/frr/frr.conf
+        validate: vtysh -f %s --dryrun
+        mode: "0640"
+      notify:
+        - Reload frr
+
+    - name: Start frr now and on boot
+      ansible.builtin.systemd_service:
+        state: started
+        enabled: true
+        name: frr
+
+    # this is ephemeral- servers will lose ips on boot
+    - name: Configure IPs
+      ansible.builtin.command:
+        cmd: "ip addr add {{ item.ipv4 }} dev {{ item.int }}"
+      loop:
+        - { int: 'lo', ip: {{ lo1_ipv4 }} }
+        - { int: 'eth1', ip: {{ eth1_ipv4 }} }
+        - { int: 'eth2', ip: {{ eth2_ipv4 }} }
