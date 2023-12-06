@@ -1,0 +1,7 @@
+---
+
+lo1_ipv4: 99.99.1.2/32
+eth1_ipv4: 100.65.1.6/30
+eth2_ipv4: 100.64.1.6/30
+
+frr_conf_file: "config-files/shared/servers/etc/frr/frr.conf"
