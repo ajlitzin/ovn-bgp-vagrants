@@ -5,7 +5,7 @@
 
   handlers:
     - name: Import re-usable handlers
-      ansible.builtin.import_tasks: "../handlers/main.yaml"
+      ansible.builtin.import_tasks: "handlers/main.yaml"
 
   tasks:
     - name: Configure interfaces
@@ -14,7 +14,7 @@
         dest: /etc/network/interfaces
         validate: ifup -a -s -i %s
         mode: "0644"
-     notify: Apply interface changes
+      notify: Apply interface changes
 
     - name: Configure FRR daemons file
       ansible.builtin.template:
@@ -39,7 +39,7 @@
 
   handlers:
     - name: Import re-usable handlers
-      ansible.builtin.import_tasks: "../handlers/main.yaml"
+      ansible.builtin.import_tasks: "handlers/main.yaml"
 
   tasks:
     - name: Configure FRR
