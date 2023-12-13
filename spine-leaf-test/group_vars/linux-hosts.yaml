@@ -1,0 +1,9 @@
+---
+
+nmcli_ethernet:
+  - conn_name: eth1
+    ifname: eth1
+    ip4: "{{ eth1_ipv4 }}"
+  - conn_name: eth2
+    ifname: eth2
+    ip4: "{{ eth2_ipv4 }}"

@@ -39,6 +39,9 @@
   gather_facts: false
   become: true
 
+  vars_files:
+    - linux-hosts.yaml
+
   handlers:
     - name: Import re-usable handlers
       ansible.builtin.import_tasks: "handlers/main.yaml"
