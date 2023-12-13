@@ -56,7 +56,7 @@
     - name: Comment out YUM mirrorlist links
       ansible.builtin.replace:
         dest: "{{ item.path }}"
-        regexp: 'mirrorlist'
+        regexp: '^mirrorlist'
         replace: '#mirrorlist'
         backup: true
       loop: "{{ yum_repo_files.files }}"
@@ -64,7 +64,7 @@
     - name: Replace YUM baseurl
       ansible.builtin.replace:
         dest: "{{ item.path }}"
-        regexp: '#baseurl=http://mirror.centos.org'
+        regexp: '^#baseurl=http://mirror.centos.org'
         replace: 'baseurl=http://vault.centos.org'
       loop: "{{ yum_repo_files.files }}"
 
