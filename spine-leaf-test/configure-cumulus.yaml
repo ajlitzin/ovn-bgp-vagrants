@@ -40,7 +40,7 @@
   become: true
 
   vars_files:
-    - linux-hosts.yaml
+    - group_vars/linux-hosts.yaml
 
   handlers:
     - name: Import re-usable handlers
@@ -117,24 +117,22 @@
         enabled: true
         name: frr
 
-    # this is ephemeral- servers will lose ips on boot
-    # TODO switch to adding interface config templates
-    # - name: Configure IPs
-    #   ansible.builtin.command:
-    #     cmd: "ip addr add {{ item.ip }} dev {{ item.int }}"
-    #   loop:
-    #     - { int: 'lo', ip: "{{ lo1_ipv4 }}" }
-    #     - { int: 'eth1', ip: "{{ eth1_ipv4 }}" }
-    #     - { int: 'eth2', ip: "{{ eth2_ipv4 }}" }
-    #   register: ip_add_result
-    #   changed_when: "ip_add_result.rc != 0"
-    - name: Configure interface IPs
+    - name: Configure loopback interface IP
+      community.general.nmcli:
+        type: loopback
+        conn_name: '{{ item.conn_name }}'
+        ip4: '{{ item.ip4 }}'
+        state: present
+      with_items:
+        - '{{ nmcli_loopback }}'
+
+    - name: Configure Ethernet interface IPs
       community.general.nmcli:
         type: ethernet
         conn_name: '{{ item.conn_name }}'
         ip4: '{{ item.ip4 }}'
         state: present
-      loop:
+      with_items:
         - '{{ nmcli_ethernet }}'
 
 # using this method because i don't currently have access to the

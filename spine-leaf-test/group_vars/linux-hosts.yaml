@@ -7,3 +7,7 @@ nmcli_ethernet:
   - conn_name: eth2
     ifname: eth2
     ip4: "{{ eth2_ipv4 }}"
+
+nmcli_loopback:
+  - conn_name: lo
+    ip4: "{{ lo1_ipv4 }}"
