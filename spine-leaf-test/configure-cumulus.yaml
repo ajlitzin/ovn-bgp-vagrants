@@ -1,6 +1,7 @@
 ---
 
-- hosts: spine-*,rack-1-leaf*, rack-2-leaf*
+- name: Network appliance configuration
+  hosts: spine-*,rack-1-leaf*, rack-2-leaf*
   become: true
 
   handlers:
@@ -33,7 +34,8 @@
       notify:
         - Reload frr
 
-- hosts: rack-1-host*
+- name: Configure Servers
+  hosts: rack-1-host*
   gather_facts: false
   become: true
 
@@ -42,6 +44,60 @@
       ansible.builtin.import_tasks: "handlers/main.yaml"
 
   tasks:
+    - name: Build list of YUM repo files
+      ansible.builtin.find:
+        paths:
+          - /etc/yum.repos.d/
+        patterns:
+          - 'CentOS-*'
+        use_regex: false
+      register: yum_repo_files
+
+    - name: Comment out YUM mirrorlist links
+      ansible.builtin.replace:
+        dest: "{{ item.path }}"
+        regexp: 'mirrorlist'
+        replace: '#mirrorlist'
+        backup: true
+      loop: "{{ yum_repo_files.files }}"
+
+    - name: Replace YUM baseurl
+      ansible.builtin.replace:
+        dest: "{{ item.path }}"
+        regexp: '#baseurl=http://mirror.centos.org'
+        replace: 'baseurl=http://vault.centos.org'
+      loop: "{{ yum_repo_files.files }}"
+
+    - name: Install FRR
+      ansible.builtin.yum:
+        name: frr
+        state: installed
+
+    - name: Ensure zebra and bgpd daemons are enabled
+      ansible.builtin.lineinfile:
+        path: /etc/frr/daemons
+        regexp: '(^zebra|bgpd=)no'
+        backrefs: true
+        line: '\g<1>yes'
+        state: present
+
+# zebra_options=("-A 127.0.0.1 --vrfwnetns")
+    - name: Ensure VRFWNETNS is enabled at the zebra options
+      ansible.builtin.lineinfile:
+        path: /etc/frr/daemons
+        regexp: '--vrfwnetns'
+        state: absent
+      check_mode: true
+      changed_when: false
+      register: vrfwnetns_found
+
+    - name: Add missing VRFWNETNS to zebra options
+      ansible.builtin.lineinfile:
+        path: /etc/frr/daemons
+        regexp: 'zebra_options=(.*)(\"\))'
+        line: 'zebra_options=\g<1> --vrfwnetns\g<2>'
+      when: not vrfwnetns_found.found
+
     - name: Configure FRR
       ansible.builtin.template:
         src: "{{ frr_conf_file }}"
@@ -59,6 +115,7 @@
         name: frr
 
     # this is ephemeral- servers will lose ips on boot
+    # TODO switch to adding interface config templates
     - name: Configure IPs
       ansible.builtin.command:
         cmd: "ip addr add {{ item.ip }} dev {{ item.int }}"
@@ -66,3 +123,41 @@
         - { int: 'lo', ip: "{{ lo1_ipv4 }}" }
         - { int: 'eth1', ip: "{{ eth1_ipv4 }}" }
         - { int: 'eth2', ip: "{{ eth2_ipv4 }}" }
+      register: ip_add_result
+      changed_when: "ip_add_result.rc != 0"
+
+    # using this method because i don't currently have access to the
+    # virtual machines so I can tell whether or not I can use static
+    # route files and use templates
+# We need to ensure that the default route is using the leafs. For rack-X-host-1 should be the next:
+# sudo ip route a 0.0.0.0/0 src 99.99.X.1 nexthop via 100.65.X.1 dev eth1 nexthop via 100.64.X.1 dev eth2
+# And for rack-X-host-2 the next:
+# sudo ip route a 0.0.0.0/0 src 99.99.X.2 nexthop via 100.65.X.5 dev eth1 nexthop via 100.64.X.5 dev eth2
+    - name: Configure static routes for rack-1-host-1
+      ansible.builtin.command:
+        cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.1.1 dev eth1 nexthop via 100.64.1.1 dev eth2"
+      register: ip_route_result
+      changed_when: "ip_add_result.rc != 0"
+      when: inventory_hostname is 'rack-1-host-1'
+
+    # could reduce this by using hostvars for leaf1/2 ips
+    - name: Configure static routes for rack-1-host-2
+      ansible.builtin.command:
+        cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.1.5 dev eth1 nexthop via 100.64.1.5 dev eth2"
+      register: ip_route_result
+      changed_when: "ip_add_result.rc != 0"
+      when: inventory_hostname is 'rack-1-host-2'
+
+    - name: Configure static routes for rack-2-host-1
+      ansible.builtin.command:
+        cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.2.1 dev eth1 nexthop via 100.64.2.1 dev eth2"
+      register: ip_route_result
+      changed_when: "ip_add_result.rc != 0"
+      when: inventory_hostname is 'rack-2-host-1'
+
+    - name: Configure static routes for rack-2-host-2
+      ansible.builtin.command:
+        cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.2.5 dev eth1 nexthop via 100.64.2.5 dev eth2"
+      register: ip_route_result
+      changed_when: "ip_add_result.rc != 0"
+      when: inventory_hostname is 'rack-2-host-2'
