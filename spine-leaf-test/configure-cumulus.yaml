@@ -135,36 +135,37 @@
       with_items:
         - '{{ nmcli_ethernet }}'
 
-# We need to ensure that the default route is using the leafs. For rack-X-host-1 should be the next:
-# sudo ip route a 0.0.0.0/0 src 99.99.X.1 nexthop via 100.65.X.1 dev eth1 nexthop via 100.64.X.1 dev eth2
-# And for rack-X-host-2 the next:
-# sudo ip route a 0.0.0.0/0 src 99.99.X.2 nexthop via 100.65.X.5 dev eth1 nexthop via 100.64.X.5 dev eth2
-
+    # could reduce this repitition by using hostvars for leaf1/2 ips
+    # blog uses the lo IP as the src for the route, but we're adding the IP
+    # to dummy0 instead and dummy interfaces can be used as a src for routes
     - name: Configure static routes for rack-1-host-1
       ansible.builtin.command:
         cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.1.1 dev eth1 nexthop via 100.64.1.1 dev eth2"
       register: ip_route_result
-      changed_when: "ip_route_result.rc != 0"
+      changed_when: 'ip_route_result.rc == 0 and "File exists" not in ip_route_result.stderr'
+      failed_when: 'ip_route_result.rc != 0 and "File exists" not in ip_route_result.stderr'
       when: inventory_hostname == 'rack-1-host-1'
 
-    could reduce this by using hostvars for leaf1/2 ips
     - name: Configure static routes for rack-1-host-2
       ansible.builtin.command:
-        cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.1.5 dev eth1 nexthop via 100.64.1.5 dev eth2"
+        cmd: "ip route a 0.0.0.0/0 nexthop via 100.65.1.5 dev eth1 nexthop via 100.64.1.5 dev eth2"
       register: ip_route_result
-      changed_when: "ip_route_result.rc == 0 or ip_route_result.rc == 2"
+      changed_when: 'ip_route_result.rc == 0 and "File exists" not in ip_route_result.stderr'
+      failed_when: 'ip_route_result.rc != 0 and "File exists" not in ip_route_result.stderr'
       when: inventory_hostname == 'rack-1-host-2'
 
     - name: Configure static routes for rack-2-host-1
       ansible.builtin.command:
         cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.2.1 dev eth1 nexthop via 100.64.2.1 dev eth2"
       register: ip_route_result
-      changed_when: "ip_route_result.rc != 0"
+      changed_when: 'ip_route_result.rc == 0 and "File exists" not in ip_route_result.stderr'
+      failed_when: 'ip_route_result.rc != 0 and "File exists" not in ip_route_result.stderr'
       when: inventory_hostname == 'rack-2-host-1'
 
     - name: Configure static routes for rack-2-host-2
       ansible.builtin.command:
         cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.2.5 dev eth1 nexthop via 100.64.2.5 dev eth2"
       register: ip_route_result
-      changed_when: "ip_route_result.rc != 0"
+      changed_when: 'ip_route_result.rc == 0 and "File exists" not in ip_route_result.stderr'
+      failed_when: 'ip_route_result.rc != 0 and "File exists" not in ip_route_result.stderr'
       when: inventory_hostname == 'rack-2-host-2'
