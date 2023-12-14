@@ -144,7 +144,7 @@
       ansible.builtin.command:
         cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.1.1 dev eth1 nexthop via 100.64.1.1 dev eth2"
       register: ip_route_result
-      changed_when: "ip_add_result.rc != 0"
+      changed_when: "ip_route_result.rc != 0"
       when: inventory_hostname == 'rack-1-host-1'
 
     # could reduce this by using hostvars for leaf1/2 ips
@@ -159,12 +159,12 @@
       ansible.builtin.command:
         cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.2.1 dev eth1 nexthop via 100.64.2.1 dev eth2"
       register: ip_route_result
-      changed_when: "ip_add_result.rc != 0"
+      changed_when: "ip_route_result.rc != 0"
       when: inventory_hostname == 'rack-2-host-1'
 
     - name: Configure static routes for rack-2-host-2
       ansible.builtin.command:
         cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.2.5 dev eth1 nexthop via 100.64.2.5 dev eth2"
       register: ip_route_result
-      changed_when: "ip_add_result.rc != 0"
+      changed_when: "ip_route_result.rc != 0"
       when: inventory_hostname == 'rack-2-host-2'
