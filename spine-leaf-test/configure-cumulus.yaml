@@ -117,14 +117,14 @@
         enabled: true
         name: frr
 
-    - name: Configure loopback interface IP
+    - name: Configure dummy interface IP
       community.general.nmcli:
-        type: loopback
+        type: dummy
         conn_name: '{{ item.conn_name }}'
         ip4: '{{ item.ip4 }}'
         state: present
       with_items:
-        - '{{ nmcli_loopback }}'
+        - '{{ nmcli_dummy }}'
 
     - name: Configure Ethernet interface IPs
       community.general.nmcli:
@@ -135,9 +135,6 @@
       with_items:
         - '{{ nmcli_ethernet }}'
 
-# using this method because i don't currently have access to the
-# virtual machines so I can tell whether or not I can use static
-# route files and use templates
 # We need to ensure that the default route is using the leafs. For rack-X-host-1 should be the next:
 # sudo ip route a 0.0.0.0/0 src 99.99.X.1 nexthop via 100.65.X.1 dev eth1 nexthop via 100.64.X.1 dev eth2
 # And for rack-X-host-2 the next:
