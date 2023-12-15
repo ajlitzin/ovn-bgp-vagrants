@@ -140,7 +140,7 @@
     # to dummy0 instead and dummy interfaces can be used as a src for routes
     - name: Configure static routes for rack-1-host-1
       ansible.builtin.command:
-        cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.1.1 dev eth1 nexthop via 100.64.1.1 dev eth2"
+        cmd: "ip route a 0.0.0.0/0 nexthop via 100.65.1.1 dev eth1 nexthop via 100.64.1.1 dev eth2"
       register: ip_route_result
       changed_when: 'ip_route_result.rc == 0 and "File exists" not in ip_route_result.stderr'
       failed_when: 'ip_route_result.rc != 0 and "File exists" not in ip_route_result.stderr'
@@ -156,7 +156,7 @@
 
     - name: Configure static routes for rack-2-host-1
       ansible.builtin.command:
-        cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.2.1 dev eth1 nexthop via 100.64.2.1 dev eth2"
+        cmd: "ip route a 0.0.0.0/0 nexthop via 100.65.2.1 dev eth1 nexthop via 100.64.2.1 dev eth2"
       register: ip_route_result
       changed_when: 'ip_route_result.rc == 0 and "File exists" not in ip_route_result.stderr'
       failed_when: 'ip_route_result.rc != 0 and "File exists" not in ip_route_result.stderr'
@@ -164,7 +164,7 @@
 
     - name: Configure static routes for rack-2-host-2
       ansible.builtin.command:
-        cmd: "ip route a 0.0.0.0/0 src {{ lo1_ipv4 }} nexthop via 100.65.2.5 dev eth1 nexthop via 100.64.2.5 dev eth2"
+        cmd: "ip route a 0.0.0.0/0 nexthop via 100.65.2.5 dev eth1 nexthop via 100.64.2.5 dev eth2"
       register: ip_route_result
       changed_when: 'ip_route_result.rc == 0 and "File exists" not in ip_route_result.stderr'
       failed_when: 'ip_route_result.rc != 0 and "File exists" not in ip_route_result.stderr'
