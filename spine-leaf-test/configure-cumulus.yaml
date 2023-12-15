@@ -135,6 +135,15 @@
       with_items:
         - '{{ nmcli_ethernet }}'
 
+    - name: Bring up eth1 and eth2
+      ansible.builtin.command:
+        cmd: "nmcli con up {{ item }}"
+      register: int_up_result
+      changed_when: 'int_up_result.rc == 0 and "File exists" not in int_up_result.stderr'
+      loop:
+        - eth1
+        - eth2
+
     # could reduce this repitition by using hostvars for leaf1/2 ips
     # blog uses the lo IP as the src for the route, but we're adding the IP
     # to dummy0 instead and dummy interfaces can be used as a src for routes
