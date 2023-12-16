@@ -97,8 +97,10 @@
     - name: Add missing VRFWNETNS to zebra options
       ansible.builtin.lineinfile:
         path: /etc/frr/daemons
-        regexp: 'zebra_options=(.*)(\"\))'
+        regexp: 'zebra_options=(.*)(\")'
+        backrefs: true
         line: 'zebra_options=\g<1> --vrfwnetns\g<2>'
+        state: present
       when: not vrfwnetns_found.found
 
     - name: Configure FRR
