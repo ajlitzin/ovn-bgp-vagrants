@@ -75,7 +75,7 @@
       when: ansible_distribution == "CentOS"
 
     # ansible.builtin.package did not work
-    - name: Centos: Install FRR
+    - name: Centos - Install FRR
       ansible.builtin.yum:
         name: frr
         state: installed
