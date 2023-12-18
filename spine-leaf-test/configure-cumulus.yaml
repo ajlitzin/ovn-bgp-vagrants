@@ -36,7 +36,7 @@
 
 - name: Configure Servers
   hosts: rack-1-host*
-  gather_facts: false
+  gather_facts: true
   become: true
 
   vars_files:
@@ -55,6 +55,7 @@
           - 'CentOS-*'
         use_regex: false
       register: yum_repo_files
+      when: ansible_distribution == "CentOS"
 
     - name: Comment out YUM mirrorlist links
       ansible.builtin.replace:
@@ -63,6 +64,7 @@
         replace: '#mirrorlist'
         backup: true
       loop: "{{ yum_repo_files.files }}"
+      when: ansible_distribution == "CentOS"
 
     - name: Replace YUM baseurl
       ansible.builtin.replace:
@@ -70,11 +72,20 @@
         regexp: '^#baseurl=http://mirror.centos.org'
         replace: 'baseurl=http://vault.centos.org'
       loop: "{{ yum_repo_files.files }}"
+      when: ansible_distribution == "CentOS"
 
-    - name: Install FRR
+    # ansible.builtin.package did not work
+    - name: Centos: Install FRR
       ansible.builtin.yum:
         name: frr
         state: installed
+      when: ansible_distribution == "CentOS"
+
+    - name: Ubuntu: Install FRR
+      ansible.builtin.apt:
+        name: frr
+        state: present
+      when: ansible_distribution == "Ubuntu"
 
     - name: Ensure zebra and bgpd daemons are enabled
       ansible.builtin.lineinfile:
@@ -119,7 +130,7 @@
         enabled: true
         name: frr
 
-    - name: Configure dummy interface IP
+    - name: Centos - Configure dummy interface IP
       community.general.nmcli:
         type: dummy
         conn_name: '{{ item.conn_name }}'
@@ -127,8 +138,9 @@
         state: present
       with_items:
         - '{{ nmcli_dummy }}'
+      when: ansible_distribution == "CentOS"
 
-    - name: Configure Ethernet interface IPs
+    - name: Centos - Configure Ethernet interface IPs
       community.general.nmcli:
         type: ethernet
         conn_name: '{{ item.conn_name }}'
@@ -136,8 +148,9 @@
         state: present
       with_items:
         - '{{ nmcli_ethernet }}'
+      when: ansible_distribution == "CentOS"
 
-    - name: Bring up eth1 and eth2
+    - name: Centos - Bring up eth1 and eth2
       ansible.builtin.command:
         cmd: "nmcli con up {{ item }}"
       register: int_up_result
@@ -145,6 +158,18 @@
       loop:
         - eth1
         - eth2
+      when: ansible_distribution == "CentOS"
+
+    - name: Ubuntu - add netplan config for lo, eth1, and eth2
+      ansible.builtin.template:
+        src: ubuntu-netplan.j2
+        dest: /etc/netplan/02-netcfg.yaml
+        mode: '0644'
+      when: ansible_distribution == "Ubuntu"
+
+    - name: Ubuntu - Apply netplan configuration
+      ansible.builtin.command: netplan apply
+      when: ansible_distribution == "Ubuntu"
 
     # could reduce this repitition by using hostvars for leaf1/2 ips
     # blog uses the lo IP as the src for the route, but we're adding the IP
