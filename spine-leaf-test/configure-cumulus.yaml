@@ -81,7 +81,7 @@
         state: installed
       when: ansible_distribution == "CentOS"
 
-    - name: Ubuntu: Install FRR
+    - name: Ubuntu - Install FRR
       ansible.builtin.apt:
         name: frr
         state: present
