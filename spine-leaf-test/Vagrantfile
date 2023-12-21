@@ -144,7 +144,7 @@ Vagrant.configure("2") do |config|
 
   ##### DEFINE VM for standalone-vm #####
   config.vm.define "standalone-vm1" do |device|
-    device.vm.box = "generic/ubuntu2004"
+    device.vm.box = "generic/ubuntu2204"
     device.vm.provider "libvirt" do |v|
       v.memory = "4096"
       v.cpus = 4
@@ -920,11 +920,7 @@ end
     
     device.vm.hostname = "rack-1-host-1" 
     
-    device.vm.box = "generic/ubuntu2004"
-# cannot use 2204 without upgrading host vagrant to 3.x
-# due to openssh on 2204 deprecating RSA keys
-#     device.vm.box = "generic/ubuntu2204"
-#     device.vm.box = "centos/8"
+    device.vm.box = "generic/ubuntu2204"
 
     device.vm.provider :libvirt do |v|
       v.nic_model_type = 'e1000' 
@@ -1013,7 +1009,7 @@ end
     
     device.vm.hostname = "rack-1-host-2" 
     
-    device.vm.box = "centos/8"
+    device.vm.box = "generic/ubuntu2204"
 
     device.vm.provider :libvirt do |v|
       v.nic_model_type = 'e1000' 
@@ -1101,7 +1097,7 @@ end
     
     device.vm.hostname = "rack-2-host-1" 
     
-    device.vm.box = "centos/8"
+    device.vm.box = "generic/ubuntu2204"
 
     device.vm.provider :libvirt do |v|
       v.nic_model_type = 'e1000' 
@@ -1189,7 +1185,7 @@ end
     
     device.vm.hostname = "rack-2-host-2" 
     
-    device.vm.box = "centos/8"
+    device.vm.box = "generic/ubuntu2204"
 
     device.vm.provider :libvirt do |v|
       v.nic_model_type = 'e1000' 
