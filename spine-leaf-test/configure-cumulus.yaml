@@ -74,6 +74,16 @@
       loop: "{{ yum_repo_files.files }}"
       when: ansible_distribution == "CentOS"
 
+
+    - name: Ensure ipv6 is enabled
+      tags: andy
+      ansible.posix.sysctl:
+        name: net.ipv6.conf.all.disable_ipv6
+        value: '0'
+        sysctl_file: /etc/sysctl.conf
+        state: present
+        reload: true
+
     # ansible.builtin.package did not work
     - name: Centos - Install FRR
       ansible.builtin.yum:

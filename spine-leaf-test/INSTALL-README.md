@@ -63,10 +63,64 @@ cd devstack
 `
 
 * install devstack.  note I still had to add the GIT_CURL_VERBOSE env var or else it bombs out trying to clone openstack repos with
-the GNU TLS error
+the GNU TLS error.  Sometimes this still failed and I just had to keep re-running it until it succeeded.  Perhaps network issues on the host I was building on - a virtual machine in Mitch's lab
 
 `
 GIT_CURL_VERBOSE=1 ./stack.sh
+`
+
+* Next I hit this error where openstack was failing to create a subnet
+
+```text
+++lib/neutron_plugins/services/l3:create_neutron_initial_network:202  oscwrap --os-cloud devstack --os-region RegionOne network create private -f value -c id
+Error while executing command: HttpException: 503, Unable to create the network. No tenant network is available for allocation.
+```
+
+Running stack.sh several times did not fix this.  I went off for about 10 day holiday break and when I came back I tried this and the devstack script progressed further, but hit another error:
+
+```text
+./unstack.sh
+./stack.sh
+<lots of output snip>
++lib/neutron_plugins/services/l3:_neutron_configure_router_v6:416  sudo ip -6 addr replace 2001:db8::2/64 dev br-ex
+RTNETLINK answers: Permission denied
+<snip>
+```
+
+## Notes when running with Ubuntu 22.04
+
+The generic/ubuntu2204 Vagrant box has ipv6 disabled.  Devstack relies on IPv6 being enabled.  The updated Vagrant file has an ansible job that updates the vm to enable ipv6.  If IPv6 is disabled you will get a confusing permission denied error when the stack.sh script attempts to apply an IPv6 address to the br-ex bridge:
+
+```
++lib/neutron_plugins/services/l3:_neutron_configure_router_v6:416  sudo ip -6 addr replace 2001:db8::2/64 dev br-ex
+```
+
+You can check if ipv6 is enabled by running:
+
+```text
+sysctl -a 2>/dev/null | grep disable_ipv6
+```
+
+If ipv6 is disabled you will see values of "1" for the output above, like this:
+
+```text
+vagrant@rack-1-host-1:~$ sysctl -a 2>/dev/null | grep disable_ipv6
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.br-ex.disable_ipv6 = 1
+net.ipv6.conf.br-int.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.eth1.disable_ipv6 = 1
+net.ipv6.conf.eth2.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
+net.ipv6.conf.ovs-system.disable_ipv6 = 1
+net.ipv6.conf.vagrant.disable_ipv6 = 1
+net.ipv6.conf.virbr0.disable_ipv6 = 1
+```
+
+You can temporarily fix this manually via the following.  note that this method will NOT survive a restart of the vagrant vm:
+
+`
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
 `
 
 ## History - trying to run on Ubuntu 20.04
