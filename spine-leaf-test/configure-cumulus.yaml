@@ -163,7 +163,7 @@
       ansible.builtin.template:
         src: ubuntu-netplan.j2
         dest: /etc/netplan/02-netcfg.yaml
-        mode: '0644'
+        mode: '0600'
       when: ansible_distribution == "Ubuntu"
 
     - name: Ubuntu - Apply netplan configuration
