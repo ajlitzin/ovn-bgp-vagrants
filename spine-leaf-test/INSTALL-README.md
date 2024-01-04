@@ -49,43 +49,72 @@ sudo su
 EDITOR=vi visudo
 `
 
+* make /opt/stack dir and change ownership
+
+`
+sudo mkdir /opt/stack
+sudo chown vagrant:root /opt/stack
+`
+
+* clone ovn-bgp-agent repo
+
+`
+cd /opt/stack/
+git clone https://opendev.org/openstack/ovn-bgp-agent
+`
+
 * clone devstack repo
 
 `
+cd
 git clone https://opendev.org/openstack/devstack
+`
+
+* copy the default config file from the ovn-bgp-agent repo into the devstack repo
+
+`
+cp /opt/stack/ovn-bgp-agent/devstack/local.conf.sample devstack/local.conf
+`
+
+* make updates to local.conf
+
+For example, enable Horizon by changing disable_service Horizon to enable_service Horizon
+* install devstack
+
+`
 cd devstack
+./stack.sh
 `
 
-* copy the default config file
+You may run into errors during the install.  I often ran into GnuTLS errors while trying to clone openstack component repos.  These all appear to be transient in nature.
+
+In short, the install scripts are great but can be a little flaky.  If you run into errors, they may be transient.  I recommend you try to unstack and then restack before you dig into any install error too deeply:
 
 `
- cp samples/local.conf .
-`
-
-* install devstack.  note I still had to add the GIT_CURL_VERBOSE env var or else it bombs out trying to clone openstack repos with
-the GNU TLS error.  Sometimes this still failed and I just had to keep re-running it until it succeeded.  Perhaps network issues on the host I was building on - a virtual machine in Mitch's lab
-
-`
-GIT_CURL_VERBOSE=1 ./stack.sh
-`
-
-* Next I hit this error where openstack was failing to create a subnet
-
-```text
-++lib/neutron_plugins/services/l3:create_neutron_initial_network:202  oscwrap --os-cloud devstack --os-region RegionOne network create private -f value -c id
-Error while executing command: HttpException: 503, Unable to create the network. No tenant network is available for allocation.
-```
-
-Running stack.sh several times did not fix this.  I went off for about 10 day holiday break and when I came back I tried this and the devstack script progressed further, but hit another error:
-
-```text
 ./unstack.sh
 ./stack.sh
-<lots of output snip>
-+lib/neutron_plugins/services/l3:_neutron_configure_router_v6:416  sudo ip -6 addr replace 2001:db8::2/64 dev br-ex
-RTNETLINK answers: Permission denied
-<snip>
-```
+`
+
+Using the local.conf from the ovn-bgp-agent repo
+
+## accessing Horizon
+Let's assume you have started with a virtual machine as your base host and used vagrant to launch more virtual machine(s) to run devstack. Your local client will not have direct access to the vagrant vm that is hosting the Horizon web management portal.  In this case you will need a chain of ssh tunnels in order to load Horizon from your local machine.
+
+local client -> base server -> vagrant vm hosting Horizon
+
+one way is to start two separate ssh tunnels, the first from your local client toward your base server, the 2nd from the base server to the vm hosting Horizon.
+
+By default Horizon listens on HTTP port 80.  We will listen locally on port 8080 and forward that on.
+
+from client to base server:
+ssh -L8080:localhost:8080 user@base-server
+
+from base server to vagrant vm hosting Horizon:
+ssh -L 8080:localhost:80 vagrant@10.255.1.233 -i ~/ovn-bgp-vagrants/spine-leaf-test/.vagrant/machines/rack-1-host-1/libvirt/private_key
+
+Note: I'm not sure there is a good way to do this in one command with the -J flag or defining it in your ssh conf file because you then would need the vagrant machine private key local to your client server and this can change if you rebuild your vagrant vm.
+
+Now in your browser on your local client you should be able to go to http://<ip or FQDN of base server>:8080/dashboard
 
 ## Notes when running with Ubuntu 22.04
 
@@ -93,6 +122,7 @@ The generic/ubuntu2204 Vagrant box has ipv6 disabled.  Devstack relies on IPv6 b
 
 ```
 +lib/neutron_plugins/services/l3:_neutron_configure_router_v6:416  sudo ip -6 addr replace 2001:db8::2/64 dev br-ex
+RTNETLINK answers: Permission denied
 ```
 
 You can check if ipv6 is enabled by running:
