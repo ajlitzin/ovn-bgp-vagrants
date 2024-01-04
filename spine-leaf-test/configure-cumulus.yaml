@@ -84,19 +84,6 @@
         state: present
         reload: true
 
-    # ansible.builtin.package did not work
-    - name: Centos - Install FRR
-      ansible.builtin.yum:
-        name: frr
-        state: installed
-      when: ansible_distribution == "CentOS"
-
-    - name: Ubuntu - Install FRR
-      ansible.builtin.apt:
-        name: frr
-        state: present
-      when: ansible_distribution == "Ubuntu"
-
     - name: Ensure zebra and bgpd daemons are enabled
       ansible.builtin.lineinfile:
         path: /etc/frr/daemons
