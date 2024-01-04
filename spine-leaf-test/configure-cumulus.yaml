@@ -92,24 +92,26 @@
         line: '\g<1>yes'
         state: present
 
+# Is this still required?  It's not included in the daemons file
+# included in the ovn-bgp-agent repo that stack.sh clones
 # zebra_options=("-A 127.0.0.1 --vrfwnetns")
-    - name: Ensure VRFWNETNS is enabled at the zebra options
-      ansible.builtin.lineinfile:
-        path: /etc/frr/daemons
-        regexp: '--vrfwnetns'
-        state: absent
-      check_mode: true
-      changed_when: false
-      register: vrfwnetns_found
+    # - name: Ensure VRFWNETNS is enabled at the zebra options
+    #   ansible.builtin.lineinfile:
+    #     path: /etc/frr/daemons
+    #     regexp: '--vrfwnetns'
+    #     state: absent
+    #   check_mode: true
+    #   changed_when: false
+    #   register: vrfwnetns_found
 
-    - name: Add missing VRFWNETNS to zebra options
-      ansible.builtin.lineinfile:
-        path: /etc/frr/daemons
-        regexp: 'zebra_options=(.*)(\")'
-        backrefs: true
-        line: 'zebra_options=\g<1> --vrfwnetns\g<2>'
-        state: present
-      when: not vrfwnetns_found.found
+    # - name: Add missing VRFWNETNS to zebra options
+    #   ansible.builtin.lineinfile:
+    #     path: /etc/frr/daemons
+    #     regexp: 'zebra_options=(.*)(\")'
+    #     backrefs: true
+    #     line: 'zebra_options=\g<1> --vrfwnetns\g<2>'
+    #     state: present
+    #   when: not vrfwnetns_found.found
 
     - name: Configure FRR
       ansible.builtin.template:
