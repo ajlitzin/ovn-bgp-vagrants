@@ -2,9 +2,6 @@ network:
   version: 2
   renderer: networkd
   ethernets:
-    {# lo:
-      addresses:
-        - {{ dummy0_ipv4 }} #}
     eth1:
       addresses:
         - {{ eth1_ipv4 }}
