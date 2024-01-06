@@ -28,15 +28,11 @@ source ~/venv/ansible-openstack/bin/activate
 pip3 install -r requirements.txt
 `
 
-* start up the vagrant vms.  Note that the cumulus vms will take 20+ minutes to fully come up before you can log into them or configure them with ansible.  Come back to those later after we install devstack on rack-1-host-1
+* start up the vagrant vm to use as the Devstack node. 
 
-`vagrant up`
+`vagrant up rack-1-host-1`
 
-* run ansible playbooks to configure ip interfaces and bgp
-
-`ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-base`
-
-* Next we are going to take elements of this ovn-bgp [blog](https://ltomasbo.wordpress.com/2023/12/19/deploying-ovn-bgp-agent-with-devstack/) entry and the [devstack install guide](https://docs.openstack.org/devstack/latest/guides/single-vm.html) to install devstack on single node, rack-1-host-1.  Eventually we'll try to extend this devstack install to multiple compute node vms
+* Next we are going to take elements of this ovn-bgp [blog](https://ltomasbo.wordpress.com/2023/12/19/deploying-ovn-bgp-agent-with-devstack/) entry and the [Devstack install guide](https://docs.openstack.org/devstack/latest/guides/single-vm.html) to install Devstack on single node, rack-1-host-1.  Eventually we'll try to extend this Devstack install to multiple compute node vms
 
 * log into rack-1-host-1
 
@@ -63,14 +59,14 @@ cd /opt/stack/
 git clone https://opendev.org/openstack/ovn-bgp-agent
 `
 
-* clone devstack repo
+* clone the devstack repo to the home dir of vagrant user
 
 `
 cd
 git clone https://opendev.org/openstack/devstack
 `
 
-* copy the default config file from the ovn-bgp-agent repo into the devstack repo
+* copy the default config file from the ovn-bgp-agent repo into the Devstack repo
 
 `
 cp /opt/stack/ovn-bgp-agent/devstack/local.conf.sample devstack/local.conf
@@ -79,7 +75,8 @@ cp /opt/stack/ovn-bgp-agent/devstack/local.conf.sample devstack/local.conf
 * make updates to local.conf
 
 For example, enable Horizon by changing disable_service Horizon to enable_service Horizon
-* install devstack
+
+* install Devstack
 
 `
 cd devstack
@@ -95,10 +92,52 @@ In short, the install scripts are great but can be a little flaky.  If you run i
 ./stack.sh
 `
 
-Using the local.conf from the ovn-bgp-agent repo
+* Validate ovn-bgp-agent operation
+ovn-bgp-agent for Devstack installs frr for you with an opinated config that relys upon the default openstack network configuration.  After Devstack install completes you should see that frr is running and be able to interact with it via vtysh.  However, the configuration doesn't include any upstream bgp peers so validating that ovn-bgp-agent is impacting BGP route advertisement is difficult at this point.
+
+However, you can validate the changes that ovn-bgp-agent makes to kernel interfaces when it detects events from the Southbound (default) ovn database.  Frr's BGP config has a policy to redistribute connected networks and a policy restricting route advertisements to host routes (/32, /128).  This Devstack build creates a dummy inteface named bgp-nic on a vrf named bgp-vrf and that is what frr is using to know which connected routes to distribute.
+
+Note that in the running config of frr you can see that the BGP definition is tied to bgp-vrf, e.g. `router bgp 64999 vrf bgp-vrf`, but I have not yet figured out how it is getting tied to the vrf.  That is not present in the [frr.conf](https://opendev.org/openstack/ovn-bgp-agent/src/branch/master/etc/frr/frr.conf) file that is included in the ovn-bgp-agent Devstack.  It seems important though or else we'd expect the frr instance to advertise any host address tied to any interface on the server, which is not happening with the vrf knob in place.
+
+Using the default ovn-bgp-agent config the agent will react to events that include virtual machines being attached to public network or ports and floating IPs.  To prove this you can spin up instances and attach them to those resources and then check that the /32 IP address ends up attached to the bgp-nic kernel interface:
+
+`ip addr show bgp-nic`
+
+If you follow the supplemental instructions in the [Luis Tomas blog entry](https://ltomasbo.wordpress.com/2023/12/19/deploying-ovn-bgp-agent-with-devstack/) to enable exposing hosts on tenant self-service networks you can also spin up a private network and attach a virtual machine to it and it's /32 address should also appear in the output of `ip addr show bgp-nic`
+
+* adding an upstream Leaf switch
+
+It's much more interesting to prove that BGP route advertising actually works than to assume it works by watching the changes to the bgp-nic interface and trusting that the configuration of the frr on the host would properly advertise to an upstream peer if it had one.  Let's take advantage of the fact that the repo this is based on was intended to spin up a mini-lab which included a leaf switch upstream to the host.
+
+Our local vagrant vm for rack-1-host-1 includes two interfaces that are virtually cabled to the virtual leafs in rack1, eth1 and eth2.  We need to configure the interfaces and make some small changes to the frr conf file to take advantage of them and configure BGP to neighbor with the upstream leaf switches.  Fortunately we already have an ansible playbook to accomplish this.
+
+* configure rack-1-host-1 to use rack-1-leaf-1 as a BGP neighbor
+`
+ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-cumulus.yaml -l rack-1-host-1 --diff
+`
+
+* configure rack-1-leaf-1
+From your earlier python virtual env on your host machine, spin up the vagrant vm for rack-1-leaf-1.  Note that it takes a looong time for it to completely come online so be patient.  Once you can ssh into rack-1-leaf-1 use ansible to configure it.
+
+`vagrant up rack-1-leaf-1
+vagrant ssh rack-1-leaf-1
+`
+
+* use ansible to configure rack-1-leaf-1
+Again, start from your python virtual env on your host machine
+
+`
+ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-cumulus.yaml -l rack-1-leaf-1
+`
+
+* once the configuration completes you should see rack-1-host-1 and rack-1-leaf-1 form a BGP session.  Check its status and routes exchanged.  You should see that every host IP bound to the bgp-nic interface of rack-1-host-1 becomes a /32 BGP route advertised from rack-1-host-1 to rack-1-leaf-1
+
+`sudo vtysh
+show ip route bgp
+`
 
 ## accessing Horizon
-Let's assume you have started with a virtual machine as your base host and used vagrant to launch more virtual machine(s) to run devstack. Your local client will not have direct access to the vagrant vm that is hosting the Horizon web management portal.  In this case you will need a chain of ssh tunnels in order to load Horizon from your local machine.
+Let's assume you have started with a virtual machine as your base host and used vagrant to launch more virtual machine(s) to run Devstack. Your local client will not have direct access to the vagrant vm that is hosting the Horizon web management portal.  In this case you will need a chain of ssh tunnels in order to load Horizon from your local machine.
 
 local client -> base server -> vagrant vm hosting Horizon
 
@@ -156,7 +195,7 @@ sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
 ## History - trying to run on Ubuntu 20.04
 
 When using the ansible provider, make sure you are in your intended ansible environment (e.g. python venv) before you run vagrant up
-The blog guide runs into trouble installing devstack on centos8.  The openstack devstack site only mentions support for Ubuntu and two other Linux distriubtions, but not centos.  So I decided to try and use ubuntu.  In the end I ran into the same error using Ubuntu.  It appears something in the pre-install script that Luis wrote is no longer working.  I am now attempting to just follow the devstack wiki to complete the install of devstack and then see if I can incorporate the blog settings.
+The blog guide runs into trouble installing Devstack on centos8.  The Openstack Devstack site only mentions support for Ubuntu and two other Linux distriubtions, but not centos.  So I decided to try and use ubuntu.  In the end I ran into the same error using Ubuntu.  It appears something in the pre-install script that Luis wrote is no longer working.  I am now attempting to just follow the Devstack wiki to complete the install of Devstack and then see if I can incorporate the blog settings.
 
 I am attempting to get the hosts working with ubuntu.  The first issue I ran into is trying to use box vagrant/jammy64.  This was because that box doesn't support the provider libvirt.  Next i found generic/ubuntu2204.  Unfortunately this box does not work either- at least when running Vagrant 2.6. The box would download and attept to start it's config process, but reach a point where vagrant is trying to ssh into the box and fail.  this appears due to the version of vagrant that was installed on my host system which is running Ubuntu 20.04.  The packaged vagrant version included with 20.04 is 2.2.6 which doesn't support generic/ubuntu2204 because Vagrant 2.2.6 relies on RSA keys and the version of OpenSSH included with 22.04 disables them by default.  This is described [here|https://github.com/hashicorp/vagrant/pull/13179] .  Workarounds include manually installing a supported version of Vagrant, or changing my box to use Ubuntu 20.04 instead of 22.04.  for now I am choosing to use 20.04
 
@@ -167,7 +206,7 @@ I am attempting to get the hosts working with ubuntu.  The first issue I ran int
 sudo apt install python3.8-distutils
 `
 
-* I ran the install_devstack master script from the blog which failed, but did produce an edited version of local.conf .  Following the devstack wiki i cloned the devstack repo.  Instead of hand editing a new local.conf, i just copied over the one that ahd been previously generated and ran the stack.sh script.  This errored out because it claimed it had not been tested on ubuntu Focal (20.04) and that if I wanted to continue I had to set the Force env var
+* I ran the install_devstack master script from the blog which failed, but did produce an edited version of local.conf .  Following the Devstack wiki I cloned the Devstack repo.  Instead of hand editing a new local.conf, i just copied over the one that ahd been previously generated and ran the stack.sh script.  This errored out because it claimed it had not been tested on ubuntu Focal (20.04) and that if I wanted to continue I had to set the Force env var
 
 `
 export FORCE=yes
