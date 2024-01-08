@@ -76,7 +76,6 @@
 
 
     - name: Ensure ipv6 is enabled
-      tags: andy
       ansible.posix.sysctl:
         name: net.ipv6.conf.all.disable_ipv6
         value: '0'
@@ -85,6 +84,9 @@
         reload: true
 
     - name: Ensure zebra and bgpd daemons are enabled
+      tags:
+        - never
+        - frr
       ansible.builtin.lineinfile:
         path: /etc/frr/daemons
         regexp: '(^zebra|bgpd=)no'
@@ -96,6 +98,9 @@
 # included in the ovn-bgp-agent repo that stack.sh clones
 # zebra_options=("-A 127.0.0.1 --vrfwnetns")
     # - name: Ensure VRFWNETNS is enabled at the zebra options
+      # tags:
+      #   - never
+      #   - frr
     #   ansible.builtin.lineinfile:
     #     path: /etc/frr/daemons
     #     regexp: '--vrfwnetns'
@@ -105,6 +110,9 @@
     #   register: vrfwnetns_found
 
     # - name: Add missing VRFWNETNS to zebra options
+      # tags:
+      #   - never
+      #   - frr
     #   ansible.builtin.lineinfile:
     #     path: /etc/frr/daemons
     #     regexp: 'zebra_options=(.*)(\")'
@@ -114,6 +122,9 @@
     #   when: not vrfwnetns_found.found
 
     - name: Configure FRR
+      tags:
+        - never
+        - frr
       ansible.builtin.template:
         src: "{{ frr_conf_file }}"
         dest: /etc/frr/frr.conf
@@ -123,6 +134,9 @@
         - Reload frr
 
     - name: Start frr now and on boot
+      tags:
+        - never
+        - frr
     # FCN of module does not work; get module not found error
       systemd:
         state: started
