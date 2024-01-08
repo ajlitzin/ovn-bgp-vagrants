@@ -1,8 +1,7 @@
 ---
 
-# temporarily configured to match devstack install for single controller/compute node
-dummy0_ipv4: 172.24.4.1/32
-dummy0_ipv6: 2001:db8::2
+dummy0_ipv4: 99.99.1.1/32
+dummy0_ipv6: 2001:db8::2/128
 eth1_ipv4: 100.65.1.2/30
 eth2_ipv4: 100.64.1.2/30
 
