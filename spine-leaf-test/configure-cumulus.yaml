@@ -193,7 +193,7 @@
 
     - name: Update stack homedir permissions
       ansible.builtin.file:
-        mode: '0777'
+        mode: +x
         path: /opt/stack
 
     - name: Add stack user to sudoers
@@ -201,8 +201,7 @@
         src: stack-sudo.j2
         dest: /etc/sudoers.d/stack
         validate: visudo -cf %s
-        # mode: "0440"
-        mode: +x
+        mode: "0440"
 
     # could reduce this repitition by using hostvars for leaf1/2 ips
     # blog uses the lo IP as the src for the route, but we're adding the IP
