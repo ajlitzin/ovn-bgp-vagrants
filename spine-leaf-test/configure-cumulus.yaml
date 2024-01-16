@@ -185,7 +185,6 @@
       when: ansible_distribution == "Ubuntu"
 
     - name: Add stack user to sudoers
-      tags:
       ansible.builtin.template:
         src: stack-sudo.j2
         dest: /etc/sudoers.d/stack
