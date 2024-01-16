@@ -203,6 +203,15 @@
         validate: visudo -cf %s
         mode: "0440"
 
+    - name: Clone ovn-bgp-agent repo
+      become: true
+      become_user: stack
+      ansible.builtin.git:
+        clone: true
+        repo: https://opendev.org/openstack/ovn-bgp-agent
+        dest: /opt/stack/
+        version: 1.0.0
+
     # could reduce this repitition by using hostvars for leaf1/2 ips
     # blog uses the lo IP as the src for the route, but we're adding the IP
     # to dummy0 instead and dummy interfaces can be used as a src for routes
