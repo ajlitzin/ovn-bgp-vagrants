@@ -205,11 +205,27 @@
         repo: https://opendev.org/openstack/devstack
         dest: /opt/stack/devstack
 
+    - name: fix ownership of ovn-bgp-agent
+      ansible.builtin.file:
+        dest: /opt/stack/ovn-bgp-agent
+        owner: vagrant
+        group: root
+        recurse: true
+
+    - name: fix ownership of devstack
+      ansible.builtin.file:
+        dest: /opt/stack/devstack
+        owner: vagrant
+        group: root
+        recurse: true
+
     - name: Add devstack local.conf file to controller node
       ansible.builtin.template:
         src: devstack-controller-local.conf.j2
         dest: /opt/stack/devstack/local.conf
         mode: '0644'
+        owner: vagrant
+        group: root
       when: inventory_hostname == "rack-1-host-1"
 
     # could reduce this repitition by using hostvars for leaf1/2 ips
