@@ -184,32 +184,20 @@
       ansible.builtin.command: netplan apply
       when: ansible_distribution == "Ubuntu"
 
-    - name: Create stack user
-      ansible.builtin.user:
-        name: stack
-        shell: /bin/bash
-        create_home: true
-        home: /opt/stack
-
-    - name: Update stack homedir permissions
+    - name: Create dir for devstack installation
       ansible.builtin.file:
-        mode: +x
+        owner: vagrant
+        group: root
         path: /opt/stack
-
-    - name: Add stack user to sudoers
-      ansible.builtin.template:
-        src: stack-sudo.j2
-        dest: /etc/sudoers.d/stack
-        validate: visudo -cf %s
-        mode: "0440"
+        mode: '0755'
+        state: directory
 
     - name: Clone ovn-bgp-agent repo
       become: true
-      become_user: stack
       ansible.builtin.git:
         clone: true
         repo: https://opendev.org/openstack/ovn-bgp-agent
-        dest: /opt/stack/
+        dest: /opt/stack/ovn-bgp-agent
         version: 1.0.0
 
     # could reduce this repitition by using hostvars for leaf1/2 ips
