@@ -193,12 +193,24 @@
         state: directory
 
     - name: Clone ovn-bgp-agent repo
-      become: true
       ansible.builtin.git:
         clone: true
         repo: https://opendev.org/openstack/ovn-bgp-agent
         dest: /opt/stack/ovn-bgp-agent
         version: 1.0.0
+
+    - name: Clone devstack repo
+      ansible.builtin.git:
+        clone: true
+        repo: https://opendev.org/openstack/devstack
+        dest: /opt/stack/devstack
+
+    - name: Add devstack local.conf file to controller node
+      ansible.builtin.template:
+        src: devstack-controller-local.conf.j2
+        dest: /opt/stack/devstack/local.conf
+        mode: '0644'
+      when: inventory_hostname == "rack-1-host-1"
 
     # could reduce this repitition by using hostvars for leaf1/2 ips
     # blog uses the lo IP as the src for the route, but we're adding the IP
