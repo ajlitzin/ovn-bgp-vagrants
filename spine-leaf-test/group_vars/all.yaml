@@ -5,3 +5,5 @@ etc_hosts_file: "config-files/{{ inventory_hostname }}/etc/hosts"
 etc_hostname_file: "config-files/{{ inventory_hostname }}/etc/hostname"
 etc_resolv_conf_file: "config-files/{{ inventory_hostname }}/etc/resolv.conf"
 cumulus_dirs: "config-files/shared/cumulus/"
+
+fixed_range: "10.4.128.0/20"
