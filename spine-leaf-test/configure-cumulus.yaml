@@ -204,6 +204,7 @@
         clone: true
         repo: https://opendev.org/openstack/devstack
         dest: /opt/stack/devstack
+        version: stable/2023.2
 
     - name: fix ownership of ovn-bgp-agent
       ansible.builtin.file:
