@@ -14,7 +14,7 @@
 
 [[local|localrc]]
 STACK_USER=vagrant
-HOST_IP={{ dummy0_ipv4 }}
+HOST_IP={{ dummy0_ipv4 | ansible.utils.ipaddr('network') }}
 FIXED_RANGE={{ fixed_range }}
 
 DATABASE_PASSWORD=password
