@@ -64,8 +64,8 @@ disable_service cinder c-sch c-api c-vol
 #enable_service cinder c-sch c-api c-vol
 
 # Enable SSL/TLS
-ENABLE_TLS=True
-enable_service tls-proxy
+#ENABLE_TLS=True
+disable_service tls-proxy
 
 # Enable ovn-bgp-agent
 enable_plugin ovn-bgp-agent https://opendev.org/openstack/ovn-bgp-agent
