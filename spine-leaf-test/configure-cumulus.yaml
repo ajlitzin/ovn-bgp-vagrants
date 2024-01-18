@@ -195,9 +195,10 @@
     - name: Clone ovn-bgp-agent repo
       ansible.builtin.git:
         clone: true
+        force: true
         repo: https://opendev.org/openstack/ovn-bgp-agent
         dest: /opt/stack/ovn-bgp-agent
-        version: 1.0.0
+        version: stable/2023.2
 
     - name: Clone devstack repo
       ansible.builtin.git:
@@ -206,19 +207,25 @@
         dest: /opt/stack/devstack
         version: stable/2023.2
 
-    - name: fix ownership of ovn-bgp-agent
+    - name: Fix ownership of ovn-bgp-agent
       ansible.builtin.file:
         dest: /opt/stack/ovn-bgp-agent
         owner: vagrant
         group: root
         recurse: true
 
-    - name: fix ownership of devstack
+    - name: Fix ownership of devstack
       ansible.builtin.file:
         dest: /opt/stack/devstack
         owner: vagrant
         group: root
         recurse: true
+
+    - name: Disable tls-proxy requirement for ovn-bgp-agent
+      ansible.builtin.lineinfile:
+        line: '         echo_summary "Info: tls-proxy is not enabled"'
+        search_string: 'die $LINENO "OVN BGP Agent requires TLS to be enabled'
+        path: /opt/stack/ovn-bgp-agent/devstack/lib/ovn-bgp-agent
 
     - name: Add devstack local.conf file to controller node
       ansible.builtin.template:
