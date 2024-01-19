@@ -226,6 +226,7 @@
         line: '         echo_summary "Info: tls-proxy is not enabled"'
         search_string: 'die $LINENO "OVN BGP Agent requires TLS to be enabled'
         path: /opt/stack/ovn-bgp-agent/devstack/lib/ovn-bgp-agent
+      when: not ansible_check_mode
 
     - name: Add devstack local.conf file to controller node
       ansible.builtin.template:
@@ -235,6 +236,17 @@
         owner: vagrant
         group: root
       when: inventory_hostname == "rack-1-host-1"
+
+    - name: Add devstack local.conf file to compute node
+      ansible.builtin.template:
+        src: devstack-compute-local.conf.j2
+        dest: /opt/stack/devstack/local.conf
+        mode: '0644'
+        owner: vagrant
+        group: root
+      when:
+        - inventory_hostname != "rack-1-host-1"
+        - inventory_hostname is match("rack-\d-host-\d")
 
     # could reduce this repitition by using hostvars for leaf1/2 ips
     # blog uses the lo IP as the src for the route, but we're adding the IP
