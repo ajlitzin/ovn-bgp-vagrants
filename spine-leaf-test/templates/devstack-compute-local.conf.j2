@@ -9,7 +9,6 @@
 #
 # This sample file came from the ovn-bgp-agent project:
 # https://opendev.org/openstack/ovn-bgp-agent
-# It has some modifications including enabling horizon
 #
 
 [[local|localrc]]
@@ -23,7 +22,7 @@ MYSQL_HOST=$SERVICE_HOST
 RABBIT_HOST=$SERVICE_HOST
 Q_HOST=$SERVICE_HOST
 GLANCE_HOSTPORT=$SERVICE_HOST:9292
-#ENABLED_SERVICES=n-cpu,c-vol,placement-client,ovn-controller,ovs-vswitchd,ovsdb-server,q-ovn-metadata-agent
+ENABLED_SERVICES=n-cpu,c-vol,placement-client,ovn-controller,ovs-vswitchd,ovsdb-server,q-ovn-metadata-agent
 NOVA_VNC_ENABLED=True
 NOVNCPROXY_URL="http://$SERVICE_HOST:6080/vnc_lite.html"
 VNCSERVER_LISTEN=$HOST_IP
@@ -35,6 +34,9 @@ SERVICE_PASSWORD=password
 SERVICE_TOKEN=password
 ADMIN_PASSWORD=password
 
+# How to connect to ovsdb-server hosting the OVN SB database
+OVN_SB_REMOTE=tcp:$SERVICE_HOST:6642
+
 Q_AGENT=ovn
 NEUTRON_AGENT=$Q_AGENT
 Q_ML2_PLUGIN_MECHANISM_DRIVERS=ovn,logger
@@ -44,41 +46,14 @@ Q_ML2_TENANT_NETWORK_TYPE="geneve"
 # Enable devstack spawn logging
 LOGFILE=$DEST/logs/stack.sh.log
 
-enable_service n-cpu
-enable_service placement-client
-enable_service ovn-controller
-enable_service q-ovn-metadata-agent
-
-# Use Neutron
-enable_service q-svc
-
-# Disable Neutron agents not used with OVN.
-disable_service q-agt
-disable_service q-l3
-disable_service q-dhcp
-disable_service q-meta
-
-# Enable services, these services depend on neutron plugin.
-enable_plugin neutron https://opendev.org/openstack/neutron stable/2023.2
-## enable_service q-trunk
-## enable_service q-dns
-## enable_service q-port-forwarding
-## enable_service q-qos
-## enable_service neutron-segments
-## enable_service q-log
-
-# How to connect to ovsdb-server hosting the OVN SB database
-OVN_SB_REMOTE=tcp:$SERVICE_HOST:6642
 
 # Horizon (the web UI) is enabled by default. You may want to disable
 # it here to speed up DevStack a bit.
-# enable_service horizon
 disable_service horizon
 
 # Cinder (OpenStack Block Storage) is disabled by default to speed up
 # DevStack a bit. You may enable it here if you would like to use it.
 disable_service cinder c-sch c-api c-vol
-#enable_service cinder c-sch c-api c-vol
 
 # Enable SSL/TLS
 #ENABLE_TLS=True
@@ -101,7 +76,6 @@ OVN_BRANCH=main
 # Pin OVN past bug
 # https://bugs.launchpad.net/neutron/+bug/2049488
 OVS_BRANCH=4102674b3ecadb0e20e512cc661cddbbc4b3d1f6
-
 
 
 # If the admin wants to enable this chassis to host gateway routers for
