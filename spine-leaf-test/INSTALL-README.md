@@ -2,102 +2,103 @@
 Starting with Ubuntu 22.04 remote vm as lab device.  To run devstack/ovn-bgp lab setup uses vagrant with libvirt.  https://vagrant-libvirt.github.io/vagrant-libvirt/
 
 * Log in to your Ubuntu 22.04 base machine
+* update apt
+
+`sudo apt update`
+
 * install libvirt and other requirements
 
-`sudo apt install libvirt-clients libvirt-daemon-system libvirt-dev ebtables`
+`sudo apt install -y libvirt-clients libvirt-daemon-system libvirt-dev ebtables`
 
 * install vagrant
 
-`sudo apt install vagrant`
+`sudo apt install -y vagrant`
+
+* install git
+
+`sudo apt install -y git`
 
 * clone repo and checkout branch
 
 `
 git clone https://github.com/ajlitzin/ovn-bgp-vagrants.git
 cd ovn-bgp-vagrants
-git checkout config-via-ansible
+git checkout multi-node-devstack
 cd spine-leaf-test
 `
 
-* install python virtual env package, create a virtual environment, activate it and install ansible
+* install python virtual env package.  Note you may need to update package version.  You can find out which version to install by trying to run `python3 -m venv test-venv` first and if it should fail it should tell you which venv python package to install. e.g.:
 
 `
-sudo apt install python3.10-venv
+sudo apt install -y python3.10-venv
+`
+
+* create a virtual environment. You should only need to do this step once.
+
+```bash
 python3 -m venv ~/venv/ansible-openstack
-source ~/venv/ansible-openstack/bin/activate
-pip3 install -r requirements.txt
-`
+```
 
-* start up the vagrant vm to use as the Devstack node. 
+* activate the virtual env.  You will need to do this once per new terminal session before you can run ansible playbooks. and install ansible.  Note this is assuming python3.10 version
+
+```bash
+source ~/venv/ansible-openstack/bin/activate
+```
+
+* install ansible into the virtual env
+
+```bash
+pip3 install -r requirements.txt
+```
+
+* Start up the vagrant vm to use as the Devstack node. Vagrant reads the Vagrantfile to know how to configure each defined virtual machine and how to connect their interfaces.  Most of the original Vagrantfile is from Luis Tomas, but I have modified it to use Ubuntu 22.04 and to include a no-op ansible play who's sole purpose is to trigger vagrant to create an ansible inventory file for the vms it creates.  Later we will uses this inventory file to configure our vagrant vms.  (!) Sometimes if you vagrant down a vm and then bring it back up vagrant gives the vm a new IP, but doesn't upgrade the inventory file.  In those cases you must update the IP in the inventory yourself (after logging into the vm to find out what it is.)
 
 `vagrant up rack-1-host-1`
 
-* Next we are going to take elements of this ovn-bgp [blog](https://ltomasbo.wordpress.com/2023/12/19/deploying-ovn-bgp-agent-with-devstack/) entry and the [Devstack install guide](https://docs.openstack.org/devstack/latest/guides/single-vm.html) to install Devstack on single node, rack-1-host-1.  Eventually we'll try to extend this Devstack install to multiple compute node vms
+* If the above errors out with a permission denied error trying to access /var/run/libvirt/libvirt-sock then you should try rebooting your server and trying again.  It may be helpful to follow this suggestion, but this didn't help me, at least not without a restart too. [Troubleshoot permission denied](https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/7/html/virtualization_deployment_and_administration_guide/sect-troubleshooting-common_libvirt_errors_and_troubleshooting#sect-The_URI_failed_to_connect_to_the_hypervisor-permission_denied)
+
+* Test logging into the vagrant vm to use as the Devstack node.
+
+`vagrant ssh rack-1-host-1`
+
+* Assuming the vagrant ssh works, exit and return to your base vm inside your python virtual environment
+
+`vagrant@rack-1-host-1~$ exit`
+
+* Run ansible play to configure rack-1-host-1.  This will add network interface configuration for the loopback interface and the eth1 and eth2 uplinks to the leaf switches.  Note that only eth1 is in use as of now.  It also prepares the server for devstack installation by creating the target directory, clones the ovn-bgp-agent and devstack repos, and copies over a modified version of the devstack local.conf config file.
+
+`
+ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-cumulus.yaml -l rack-1-host-1 --diff
+`
+
+* Next we are going to take elements of this ovn-bgp [blog](https://ltomasbo.wordpress.com/2023/12/19/deploying-ovn-bgp-agent-with-devstack/) entry and the [Devstack install guide](https://docs.openstack.org/devstack/latest/guides/single-vm.html) to install Devstack on the controller node, rack-1-host-1.  Once the controller is built we'll build a 2nd compute node, install Devtack and configure it.
 
 * log into rack-1-host-1
 
 ` vagrant ssh rack-1-host-1`
 
-* add vagrant user to sudoers file.  Add `vagrant ALL=(ALL) NOPASSWD:ALL`
+* Install Devstack.  Note that this is a pretty involved set of shell scripts that I'm not sure would run well via ansible playbook
 
-`
-sudo su
-EDITOR=vi visudo
-`
-
-* make /opt/stack dir and change ownership
-
-`
-sudo mkdir /opt/stack
-sudo chown vagrant:root /opt/stack
-`
-
-* clone ovn-bgp-agent repo
-
-`
-cd /opt/stack/
-git clone https://opendev.org/openstack/ovn-bgp-agent
-`
-
-* clone the devstack repo to the home dir of vagrant user
-
-`
-cd
-git clone https://opendev.org/openstack/devstack
-`
-
-* copy the default config file from the ovn-bgp-agent repo into the Devstack repo
-
-`
-cp /opt/stack/ovn-bgp-agent/devstack/local.conf.sample devstack/local.conf
-`
-
-* make updates to local.conf
-
-For example, enable Horizon by changing disable_service Horizon to enable_service Horizon
-
-* install Devstack
-
-`
+```bash
 cd devstack
 ./stack.sh
-`
+```
 
 You may run into errors during the install.  I often ran into GnuTLS errors while trying to clone openstack component repos.  These all appear to be transient in nature.
 
 In short, the install scripts are great but can be a little flaky.  If you run into errors, they may be transient.  I recommend you try to unstack and then restack before you dig into any install error too deeply:
 
-`
+```bash
 ./unstack.sh
 ./stack.sh
-`
+```
 
 * Validate ovn-bgp-agent operation
-ovn-bgp-agent for Devstack installs frr for you with an opinated config that relys upon the default openstack network configuration.  After Devstack install completes you should see that frr is running and be able to interact with it via vtysh.  However, the configuration doesn't include any upstream bgp peers so validating that ovn-bgp-agent is impacting BGP route advertisement is difficult at this point.
+ovn-bgp-agent for Devstack installs FRR for you with an opinated config that relys upon the default openstack network configuration.  After Devstack install completes you should see that FRR is running and be able to interact with it via vtysh.  However, the configuration doesn't include any upstream bgp peers so validating that ovn-bgp-agent is impacting BGP route advertisement is difficult at this point.
 
-However, you can validate the changes that ovn-bgp-agent makes to kernel interfaces when it detects events from the Southbound (default) ovn database.  Frr's BGP config has a policy to redistribute connected networks and a policy restricting route advertisements to host routes (/32, /128).  This Devstack build creates a dummy inteface named bgp-nic on a vrf named bgp-vrf and that is what frr is using to know which connected routes to distribute.
+You can validate the changes that ovn-bgp-agent makes to kernel interfaces when it detects events from the Southbound OVN database.  FRR's BGP config has a policy to redistribute connected networks and a policy restricting route advertisements to host routes (/32, /128).  This Devstack build creates a dummy inteface named bgp-nic on a vrf named bgp-vrf and that is what FRR is using to know which connected routes to distribute.
 
-Note that in the running config of frr you can see that the BGP definition is tied to bgp-vrf, e.g. `router bgp 64999 vrf bgp-vrf`, but I have not yet figured out how it is getting tied to the vrf.  That is not present in the [frr.conf](https://opendev.org/openstack/ovn-bgp-agent/src/branch/master/etc/frr/frr.conf) file that is included in the ovn-bgp-agent Devstack.  It seems important though or else we'd expect the frr instance to advertise any host address tied to any interface on the server, which is not happening with the vrf knob in place.
+Note that in the running config of FRR you can see that the BGP definition is tied to bgp-vrf, e.g. `router bgp 64999 vrf bgp-vrf`, but I have not yet figured out how it is getting tied to the vrf.  That is not present in the [frr.conf](https://opendev.org/openstack/ovn-bgp-agent/src/branch/master/etc/frr/frr.conf) file that is included in the ovn-bgp-agent Devstack.  It seems important though or else we'd expect the FRR instance to advertise any host address tied to any interface on the server, which is not happening with the vrf knob in place.
 
 Using the default ovn-bgp-agent config the agent will react to events that include virtual machines being attached to public network or ports and floating IPs.  To prove this you can spin up instances and attach them to those resources and then check that the /32 IP address ends up attached to the bgp-nic kernel interface:
 
@@ -107,24 +108,23 @@ If you follow the supplemental instructions in the [Luis Tomas blog entry](https
 
 * adding an upstream Leaf switch
 
-It's much more interesting to prove that BGP route advertising actually works than to assume it works by watching the changes to the bgp-nic interface and trusting that the configuration of the frr on the host would properly advertise to an upstream peer if it had one.  Let's take advantage of the fact that the repo this is based on was intended to spin up a mini-lab which included a leaf switch upstream to the host.
+It's much more interesting to prove that BGP route advertising actually works than to assume it works by watching the changes to the bgp-nic interface and trusting that the configuration of the FRR on the host would properly advertise to an upstream peer if it had one.  Let's take advantage of the fact that the repo this is based on was intended to spin up a mini-lab which included a leaf switch upstream to the host.
 
-Our local vagrant vm for rack-1-host-1 includes two interfaces that are virtually cabled to the virtual leafs in rack1, eth1 and eth2.  We need to configure the interfaces and make some small changes to the frr conf file to take advantage of them and configure BGP to neighbor with the upstream leaf switches.  Fortunately we already have an ansible playbook to accomplish this.
+Our local vagrant vm for rack-1-host-1 includes two interfaces that are virtually cabled to the virtual leafs in rack1, eth1 and eth2.  We need to configure the interfaces and make some small changes to the FRR conf file to take advantage of them and configure BGP to neighbor with the upstream leaf switches.  Fortunately we already have an ansible playbook to accomplish this.
 
-* configure rack-1-host-1 to use rack-1-leaf-1 as a BGP neighbor
+* From your python virtual env on your host machine, run the ansible playbook to configure rack-1-host-1 to use rack-1-leaf-1 as a BGP neighbor
+
 `
-ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-cumulus.yaml -l rack-1-host-1 --diff
+ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-cumulus.yaml -l rack-1-host-1 --tags frr --diff
 `
 
 * configure rack-1-leaf-1
-From your earlier python virtual env on your host machine, spin up the vagrant vm for rack-1-leaf-1.  Note that it takes a looong time for it to completely come online so be patient.  Once you can ssh into rack-1-leaf-1 use ansible to configure it.
+From your earlier python virtual env on your host machine, spin up the vagrant vm for rack-1-leaf-1.  Note that it takes a looong time, sometimes 20 minutes, for it to completely come online so be patient.  Once you can ssh into rack-1-leaf-1 use ansible to configure it.
 
-`vagrant up rack-1-leaf-1
-vagrant ssh rack-1-leaf-1
-`
+`vagrant up rack-1-leaf-1`
 
 * use ansible to configure rack-1-leaf-1
-Again, start from your python virtual env on your host machine
+From within your python virtual env on your host machine, run the configuration playbook against the leaf:
 
 `
 ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-cumulus.yaml -l rack-1-leaf-1
@@ -132,34 +132,97 @@ ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inve
 
 * once the configuration completes you should see rack-1-host-1 and rack-1-leaf-1 form a BGP session.  Check its status and routes exchanged.  You should see that every host IP bound to the bgp-nic interface of rack-1-host-1 becomes a /32 BGP route advertised from rack-1-host-1 to rack-1-leaf-1
 
-`sudo vtysh
+```text
+sudo vtysh
 show ip route bgp
-`
-
-## accessing Horizon
-Let's assume you have started with a virtual machine as your base host and used vagrant to launch more virtual machine(s) to run Devstack. Your local client will not have direct access to the vagrant vm that is hosting the Horizon web management portal.  In this case you will need a chain of ssh tunnels in order to load Horizon from your local machine.
-
-local client -> base server -> vagrant vm hosting Horizon
-
-one way is to start two separate ssh tunnels, the first from your local client toward your base server, the 2nd from the base server to the vm hosting Horizon.
-
-By default Horizon listens on HTTP port 80.  We will listen locally on port 8080 and forward that on.
-
-from client to base server:
-ssh -L8080:localhost:8080 user@base-server
-
-from base server to vagrant vm hosting Horizon:
-ssh -L 8080:localhost:80 vagrant@10.255.1.233 -i ~/ovn-bgp-vagrants/spine-leaf-test/.vagrant/machines/rack-1-host-1/libvirt/private_key
-
-Note: I'm not sure there is a good way to do this in one command with the -J flag or defining it in your ssh conf file because you then would need the vagrant machine private key local to your client server and this can change if you rebuild your vagrant vm.
-
-Now in your browser on your local client you should be able to go to http://<ip or FQDN of base server>:8080/dashboard
-
-## Notes when running with Ubuntu 22.04
-
-The generic/ubuntu2204 Vagrant box has ipv6 disabled.  Devstack relies on IPv6 being enabled.  The updated Vagrant file has an ansible job that updates the vm to enable ipv6.  If IPv6 is disabled you will get a confusing permission denied error when the stack.sh script attempts to apply an IPv6 address to the br-ex bridge:
-
 ```
+
+* add iptables SNAT rule
+
+The Geneve tunnels will use the loopback as destinations, but they also need to use the loopback IP as their src IP when communicating with the remote Geneve TEP.  We use an iptables rule to force this to happen.  (!) This was not in Luis's blog, but I found my Geneve tunnels would not come up if I didn't do it.
+
+```bash
+sudo iptables -t nat -A POSTROUTING -o eth1 -d 99.99.1.2 -p all -j SNAT --to 99.99.1.1
+```
+
+* cycle the interface
+
+```bash
+ip set dev eth1 down
+ip set dev eth1 up
+```
+
+* check status of Geneve tunnel
+
+It should show that it's down because we haven't configured the 2nd node yet
+
+```bash
+sudo ovs-vsctl show | grep geneve -C 3
+```
+
+You should see something like this:
+
+```bash
+vagrant@rack-1-host-1:~$ sudo ovs-vsctl show | grep geneve -C 3
+            Interface tapa4c4cc51-79
+        Port ovn-16e9c0-0
+            Interface ovn-16e9c0-0
+                type: geneve
+                options: {csum="true", key=flow, remote_ip="99.99.1.2"}
+                bfd_status: {diagnostic="Control Detection Time Expired", flap_count="11", forwarding="true", remote_diagnostic="Neighbor Signaled Session Down", remote_state=down, state=down}
+        Port tapb356b4aa-29
+```
+
+* Begin steps to add 2nd compute node, rack-1-host-2
+
+* add iptables SNAT rule
+
+```bash
+sudo iptables -t nat -A POSTROUTING -o eth1 -d 99.99.1.1 -p all -j SNAT --to 99.99.1.2
+```
+
+* cycle the interface
+
+```bash
+ip set dev eth1 down
+ip set dev eth1 up
+```
+
+* check status of Geneve tunnel
+
+Now it should show that it's up because we both endpoints are configured
+
+```bash
+sudo ovs-vsctl show | grep geneve -C 3
+```
+
+You should see something like this:
+
+```bash
+vagrant@rack-1-host-1:~$ sudo ovs-vsctl show | grep geneve -C 3
+            Interface tapa4c4cc51-79
+        Port ovn-16e9c0-0
+            Interface ovn-16e9c0-0
+                type: geneve
+                options: {csum="true", key=flow, remote_ip="99.99.1.2"}
+                bfd_status: {diagnostic="Control Detection Time Expired", flap_count="11", forwarding="true", remote_diagnostic="Neighbor Signaled Session Down", remote_state=up, state=up}
+        Port tapb356b4aa-29
+```
+
+* Disable TLS Requirements
+By default ovn-bgp-agent enables TLS communication when it makes calls to the openstack API services.  This works fine in a single node devstack cluster, but it breaks when adding compute nodes.  This is because devstack does not currently properly distribute its Certificate Authority root and chain certificates which causes trust issues when the TLS client for ovn-bgp-agent on the new nodes try to communicate with the services. The configure-cumulus playbook has a task that updates the ovn-bgp-agent file so that it doesn't require TLS to be enabled.  However, we don't get an opportunity
+
+## Common installation problems
+
+### Ansible gets a timeout when trying to connect to a vagrant virtual machine
+
+This usually happens if you destroy a vm and then recreate it. It may happen if you shut down and then later bring up a vm.  In these scenarios Vagrant might give the vm a new IP address, but it's not kind enough to update it's ansible inventory file.  Log into the new vm and gather it's IP address.  Then edit the inventory file, .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory, and update the IP for the vm.
+
+### RTNETLINK answers: Permission denied aka make sure IPv6 is enabled
+
+The generic/ubuntu2204 Vagrant box has ipv6 disabled.  Devstack relies on IPv6 being enabled.  The configure-cumulus ansible playbook has a task that updates the vm to enable ipv6.  If IPv6 is disabled you will get a confusing permission denied error when the stack.sh script attempts to apply an IPv6 address to the br-ex bridge:
+
+```text
 +lib/neutron_plugins/services/l3:_neutron_configure_router_v6:416  sudo ip -6 addr replace 2001:db8::2/64 dev br-ex
 RTNETLINK answers: Permission denied
 ```
@@ -186,11 +249,74 @@ net.ipv6.conf.vagrant.disable_ipv6 = 1
 net.ipv6.conf.virbr0.disable_ipv6 = 1
 ```
 
-You can temporarily fix this manually via the following.  note that this method will NOT survive a restart of the vagrant vm:
+You can temporarily fix this manually via the following.  Note that this method will NOT survive a restart of the vagrant vm:
 
 `
 sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
 `
+
+## Using SSH port forwarding to Access Horizon
+
+Let's assume you have started with a virtual machine as your base host and used vagrant to launch more virtual machine(s) to run Devstack. Your local client will not have direct access to the vagrant vm that is hosting the Horizon web management portal.  In this case you will need a chain of ssh tunnels in order to load Horizon from your local machine.
+
+local client -> base server -> vagrant vm hosting Horizon
+
+one way is to start two separate ssh tunnels, the first from your local client toward your base server, the 2nd from the base server to the vm hosting Horizon.
+
+By default Horizon listens on HTTP port 80.  We will listen locally on port 8080 and forward that on.
+
+from client to base server:
+ssh -L8080:localhost:8080 user@base-server
+
+from base server to vagrant vm hosting Horizon:
+ssh -L 8080:localhost:80 vagrant@10.255.1.233 -i ~/ovn-bgp-vagrants/spine-leaf-test/.vagrant/machines/rack-1-host-1/libvirt/private_key
+
+Note: I'm not sure there is a good way to do this in one command with the -J flag or defining it in your ssh conf file because you then would need the vagrant machine private key local to your client server and this can change if you rebuild your vagrant vm.
+
+Now in your browser on your local client you should be able to go to http://<ip or FQDN of base server>:8080/dashboard
+
+## How to get TLS working on a multi-node devstack installation
+
+It is possible to get TLS to work on a multi-node devstack installation.  Essentially to get it working you distribute the CA root and intermediate certificates from the controller node to all other nodes in the cluster. However, there are some tricks in the timing.
+
+First, if you are using the configure-cumulus playbook, before you run it the first time to configure your compute node you'll need to comment out or otherwise skip the task "Disable tls-proxy requirement for ovn-bgp-agent"
+
+All the following steps need to occur before you run stack.sh on the 2nd+ compute nodes.
+
+Next, get a copy of /opt/stack/data/ca-bundle.pem, /opt/stack/data/devstack-cert.pem and /etc/ssl/certs/ca-certificates.crt from your controller node and copy it to the same location on your compute node.  Either via cut and paste or other method.
+
+By default when you run stack.sh it creates it's own local CA and updates the files you just updated with the CA certificate files from the controler. So we need to stop that by editing stack.sh as follows:
+
+```text
+vagrant@rack-1-host-2:~/devstack$ git diff stack.sh
+diff --git a/stack.sh b/stack.sh
+index dce15ac0..416fde38 100755
+--- a/stack.sh
++++ b/stack.sh
+@@ -605,7 +605,7 @@ uname -a
+ 
+ # Reset the bundle of CA certificates
+ SSL_BUNDLE_FILE="$DATA_DIR/ca-bundle.pem"
+-rm -f $SSL_BUNDLE_FILE
++##rm -f $SSL_BUNDLE_FILE
+ 
+ # Import common services (database, message queue) configuration
+ source $TOP_DIR/lib/database
+@@ -895,9 +895,10 @@ fi
+ # we don't run into problems with missing certs when apache
+ # is restarted.
+ if is_service_enabled tls-proxy; then
+-    configure_CA
+-    init_CA
+-    init_cert
++    #configure_CA
++    #init_CA
++    #init_cert
++    echo_summary "let's try skipping this..."
+ fi
+ ```
+
+Now if you run stack.sh it should complete and properly configure ovn-bgp-agent to use TLS
 
 ## History - trying to run on Ubuntu 20.04
 
@@ -233,5 +359,3 @@ or for repated failures, turn off ssl verification (yuck):
 git config --global http.sslVerify false
 git config --global http.postBuffer 1048576000
 `
-
-* next issue is neutron didn't start 
