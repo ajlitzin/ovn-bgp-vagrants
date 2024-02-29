@@ -157,8 +157,8 @@ sudo iptables -t nat -A POSTROUTING -o eth1 -d 99.99.1.2 -p all -j SNAT --to 99.
 May not be strictly required, but I did have at least one occastion where the server ignored the NAT rule until I did this.
 
 ```bash
-ip set dev eth1 down
-ip set dev eth1 up
+sudo ip link set dev eth1 down
+sudo ip link set dev eth1 up
 ```
 
 * Check status of Geneve tunnel
@@ -195,8 +195,8 @@ sudo iptables -t nat -A POSTROUTING -o eth1 -d 99.99.1.1 -p all -j SNAT --to 99.
 May not be strictly required, but I did have at least one occastion where the server ignored the NAT rule until I did this.
 
 ```bash
-ip set dev eth1 down
-ip set dev eth1 up
+sudo ip link set dev eth1 down
+sudo ip link set dev eth1 up
 ```
 
 * Check status of Geneve tunnel
