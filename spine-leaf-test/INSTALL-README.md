@@ -184,13 +184,45 @@ vagrant@rack-1-host-1:~$ sudo ovs-vsctl show | grep geneve -C 3
 
 * Begin steps to add 2nd compute node, rack-1-host-2
 
+* Start up the vagrant vm to use as the second Devstack compute node.
+
+`vagrant up rack-1-host-2`
+
+* Test logging into the vagrant vm to use as the Devstack node.
+
+`vagrant ssh rack-1-host-2`
+
+* Assuming the vagrant ssh works, exit and return to your base vm inside your python virtual environment
+
+`vagrant@rack-1-host-2~$ exit`
+
+* Run ansible play to configure rack-1-host-2
+
+`
+ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-cumulus.yaml -l rack-1-host-2 --diff
+`
+* Log into rack-1-host-2
+
+` vagrant ssh rack-1-host-2`
+
+* Install Devstack. Troubleshoot as necessary using notes from earlier Devstack install on the first host.
+
+```bash
+cd devstack
+./stack.sh
+```
+
+* Validate ovn-bgp-agent operation
+
+Use the same methods you used on the intial node
+
 * Add iptables SNAT rule
 
 ```bash
 sudo iptables -t nat -A POSTROUTING -o eth1 -d 99.99.1.1 -p all -j SNAT --to 99.99.1.2
 ```
 
-* cycle the interface
+* Cycle the interface
 
 May not be strictly required, but I did have at least one occastion where the server ignored the NAT rule until I did this.
 
@@ -220,15 +252,46 @@ vagrant@rack-1-host-1:~$ sudo ovs-vsctl show | grep geneve -C 3
         Port tapb356b4aa-29
 ```
 
-* Disable TLS Requirements
+## Debug Tips
 
-By default ovn-bgp-agent enables TLS communication when it makes calls to the openstack API services.  This works fine in a single node devstack cluster, but it breaks when adding compute nodes.  This is because devstack does not currently properly distribute its Certificate Authority root and chain certificates which causes trust issues when the TLS client for ovn-bgp-agent on the new nodes try to communicate with the services. The configure-cumulus playbook has a task that updates the ovn-bgp-agent file so that it doesn't require TLS to be enabled.  However, we don't get an opportunity
+### View the ovn-bgp-agent logs
+
+ `sudo journalctl -u devstack@ovn-bgp-agent`
+
+### Geneve tunnel does not come up
+
+Verify you have the iptables SNAT rule in place that rewrites the source address of every packet destined for the remote node loopback IP with the local node's loopback IP:
+
+`sudo iptables --numeric -L -t nat`
+
+Use tcpdump to make sure the iptables SNAT rule is working as expected.
+
+`sudo tcpdump -nn -i eth1 geneve`
+
+You should see geneve packets being set using the loopback addresses.  If the SNAT is not working you will see geneve packets sourced from one of the BGP p2p interface addresses.
 
 ## Common installation problems
+
+### Error: TLS is not enabled
+
+The configure-cumulus playbook should properly disable TLS requirement for ovn-bgp-agent.  If you still get an error you may need to manually disable it and re-run stack.sh.  Look at the task in the playbook to see how to disable TLS for ovn-bgp-agent.
 
 ### Ansible gets a timeout when trying to connect to a vagrant virtual machine
 
 This usually happens if you destroy a vm and then recreate it. It may happen if you shut down and then later bring up a vm.  In these scenarios Vagrant might give the vm a new IP address, but it's not kind enough to update it's ansible inventory file.  Log into the new vm and gather it's IP address.  Then edit the inventory file, .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory, and update the IP for the vm.
+
+### ovn-bgp-agent logs Unexpected exception while running the sync: (100, 'Network is down')
+
+This often means that for some reason the ovs bridges are down.  Check their status with `ip link show br-ex` and `ip link show br-int`.  You may be able to bring them back up like
+
+```bash
+sudo ip link set br-ex up
+sudo ip link set br-int up
+```
+
+### ovn-bgp-agent logs Exception: Could not retrieve schema from tcp
+
+This means there is a connectivity issue trying to reach the controller node hosting the OVN SB DB.  Check your routing/firewall
 
 ### RTNETLINK answers: Permission denied aka make sure IPv6 is enabled
 
