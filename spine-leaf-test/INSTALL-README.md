@@ -467,6 +467,31 @@ Now your vms should be able to communicate with each other.  Note that in my exp
 
 As ovn-bgp-agent is meant to be adding these flows you should examine the ovn-bgp-agent logs for any errors.
 
+### Removing the IPtables SNAT rules for loopback to loopback communication
+
+* Dump out the rules in the format you can use to delete them:
+
+```bash
+sudo iptables -t nat -S
+```
+
+* Identify the rule you want to delete
+e.g.
+
+```bash
+sudo iptables -t nat -S
+-P PREROUTING ACCEPT
+<snip>
+-A POSTROUTING -d 99.99.1.2/32 -o eth1 -j SNAT --to-source 99.99.1.1 <---- Let's remove this SNAT rule
+<snip>
+```
+
+* Delete the SNAT rule
+
+```bash
+sudo iptables -t nat -D POSTROUTING -d 99.99.1.1/32 -o eth1 -j SNAT --to-source 99.99.1.2
+```
+
 ## Using SSH port forwarding to Access Horizon
 
 Let's assume you have started with a virtual machine as your base host and used vagrant to launch more virtual machine(s) to run Devstack. Your local client will not have direct access to the vagrant vm that is hosting the Horizon web management portal.  In this case you will need a chain of ssh tunnels in order to load Horizon from your local machine.
