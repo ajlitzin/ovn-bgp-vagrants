@@ -266,6 +266,7 @@
       failed_when: 'ip_route_result.rc != 0 and "File exists" not in ip_route_result.stderr'
       when: inventory_hostname == 'rack-1-host-2'
 
+    # Ensure Geneve tunnel packets are properly sourced from loopback IP
     - name: Apply iptables SNAT rule for r-1-h-1 loopback to r-1-h-2
       tags: snat
       ansible.builtin.iptables:
@@ -278,6 +279,7 @@
         to_source: "{{ dummy0_ipv4 | ansible.utils.ipaddr('network') }}"
       when: inventory_hostname == 'rack-1-host-1'
 
+    # Ensure Geneve tunnel packets are properly sourced from loopback IP
     - name: Apply iptables SNAT rule for r-1-h-2 loopback to r-1-h-1
       tags: snat
       ansible.builtin.iptables:
