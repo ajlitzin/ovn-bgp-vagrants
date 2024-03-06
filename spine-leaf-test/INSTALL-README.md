@@ -1,9 +1,10 @@
 # Summary
 
-Starting with Ubuntu 22.04 remote vm as lab device.  To run devstack/ovn-bgp lab setup uses vagrant with libvirt.  https://vagrant-libvirt.github.io/vagrant-libvirt/
+Starting with Ubuntu 22.04 remote vm as lab device.  To run devstack/ovn-bgp lab setup uses [vagrant with libvirt]( https://vagrant-libvirt.github.io/vagrant-libvirt/)
 
 * Log in to your Ubuntu 22.04 base machine
-* Update apt
+
+* Update packages with apt
 
 `sudo apt update`
 
@@ -69,15 +70,15 @@ pip3 install -r requirements.txt
 
 * Run ansible play to configure rack-1-host-1.  This will add network interface configuration for the loopback interface and the eth1 and eth2 uplinks to the leaf switches.  Note that only eth1 is in use as of now.  It also prepares the server for devstack installation by creating the target directory, clones the ovn-bgp-agent and devstack repos, and copies over a modified version of the devstack local.conf config file.
 
-`
+```bash
 ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-cumulus.yaml -l rack-1-host-1 --diff
-`
+```
 
 * Next we are going to take elements of this ovn-bgp [blog](https://ltomasbo.wordpress.com/2023/12/19/deploying-ovn-bgp-agent-with-devstack/) entry and the [Devstack install guide](https://docs.openstack.org/devstack/latest/guides/single-vm.html) to install Devstack on the controller node, rack-1-host-1.  Once the controller is built we'll build a 2nd compute node, install Devtack and configure it.
 
 * Log into rack-1-host-1
 
-` vagrant ssh rack-1-host-1`
+`vagrant ssh rack-1-host-1`
 
 * Install Devstack.  Note that this is a pretty involved set of shell scripts that I'm not sure would run well via ansible playbook
 
@@ -101,7 +102,7 @@ ovn-bgp-agent for Devstack installs FRR for you with an opinated config that rel
 
 You can validate the changes that ovn-bgp-agent makes to kernel interfaces when it detects events from the Southbound OVN database.  FRR's BGP config has a policy to redistribute connected networks and a policy restricting route advertisements to host routes (/32, /128).  This Devstack build creates a dummy inteface named bgp-nic on a vrf named bgp-vrf and that is what FRR is using to know which connected routes to distribute.
 
-Note that in the running config of FRR you can see that the BGP definition is tied to bgp-vrf, e.g. `router bgp 64999 vrf bgp-vrf`. This is important to the config and how it ties to the kernel routing, but you may notices that is not present in the [frr.conf](https://opendev.org/openstack/ovn-bgp-agent/src/branch/master/etc/frr/frr.conf) file that is included in the ovn-bgp-agent Devstack.  It gets added later via calls to functions in https://opendev.org/openstack/ovn-bgp-agent/src/branch/stable/2023.2/ovn_bgp_agent/drivers/openstack/utils/frr.py
+Note that in the running config of FRR you can see that the BGP definition is tied to bgp-vrf, e.g. `router bgp 64999 vrf bgp-vrf`. This is important to the config and how it ties to the kernel routing, but you may notices that is not present in the [frr.conf](https://opendev.org/openstack/ovn-bgp-agent/src/branch/master/etc/frr/frr.conf) file that is included in the ovn-bgp-agent Devstack.  The ovn-bgp-agent checks for its existance and adds if if it's missing via calls to functions in [frr.py](https://opendev.org/openstack/ovn-bgp-agent/src/branch/stable/2023.2/ovn_bgp_agent/drivers/openstack/utils/frr.py)
 
 Using the default ovn-bgp-agent config the agent will react to events that include virtual machines being attached to public network or ports and floating IPs.  To prove this you can spin up instances and attach them to those resources and then check that the /32 IP address ends up attached to the bgp-nic kernel interface:
 
@@ -139,7 +140,7 @@ ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inve
 
 Once the configuration completes you should see rack-1-host-1 and rack-1-leaf-1 form a BGP session.  Check its status and routes exchanged.  You should see that every host IP bound to the bgp-nic interface of rack-1-host-1 becomes a /32 BGP route advertised from rack-1-host-1 to rack-1-leaf-1
 
-```text
+```bash
 sudo vtysh
 show ip route bgp
 ```
@@ -198,23 +199,13 @@ vagrant@rack-1-host-1:~$ sudo ovs-vsctl show | grep geneve -C 3
 
 * Run ansible play to configure rack-1-host-2
 
-`
-ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-cumulus.yaml -l rack-1-host-2 --diff
-`
-* Log into rack-1-host-2
-
-` vagrant ssh rack-1-host-2`
-
-* Install Devstack. Troubleshoot as necessary using notes from earlier Devstack install on the first host.
-
 ```bash
-cd devstack
-./stack.sh
+ansible-playbook -i .vagrant/provisioners/ansible/inventory/vagrant_ansible_inventory configure-cumulus.yaml -l rack-1-host-2 --diff
 ```
 
-* Validate ovn-bgp-agent operation
+* Log into rack-1-host-2
 
-Use the same methods you used on the intial node
+`vagrant ssh rack-1-host-2`
 
 * Add iptables SNAT rule
 
@@ -229,6 +220,37 @@ May not be strictly required, but I did have at least one occastion where the se
 ```bash
 sudo ip link set dev eth1 down
 sudo ip link set dev eth1 up
+```
+
+* Install Devstack. Troubleshoot as necessary using notes from earlier Devstack install on the first host.
+
+```bash
+cd devstack
+./stack.sh
+```
+
+* Validate ovn-bgp-agent operation
+
+Use the same methods you used on the intial node
+
+* From controller node, use tool to map new compute node to nova cell.
+
+Log back into the controller node, e.g. rack-1-host-1
+
+* Source OpenStack
+  
+This will load the environment required to run the OpenStack CLI commands.
+From your controller vm, rack-1-host-1:
+
+```bash
+cd /opt/stack/devstack
+source openrc admin demo
+```
+
+* Run script to add new compute node to the cell
+
+```bash
+tools/discover_hosts.sh
 ```
 
 * Check status of Geneve tunnel
@@ -252,11 +274,124 @@ vagrant@rack-1-host-1:~$ sudo ovs-vsctl show | grep geneve -C 3
         Port tapb356b4aa-29
 ```
 
-## Debug Tips
+* Use the Openstack CLI from controller node to Launch vms
+Alternatively you could use the Horizon dashboard
+  * Source OpenStack
+  
+This will load the environment required to run the OpenStack CLI commands.
+From your controller vm, rack-1-host-1:
 
-### View the ovn-bgp-agent logs
+```bash
+cd /opt/stack/devstack
+source openrc admin demo
+```
 
- `sudo journalctl -u devstack@ovn-bgp-agent`
+* Open security group to allow our access to it
+Note that in production or non-virtual lab you wouldn't want to open your SG like this
+
+```bash
+openstack security group create -c id -f value sg-testing
+openstack security group rule create --protocol tcp sg-testing
+openstack security group rule create --protocol icmp sg-testing
+```
+
+* Build a vm on rack-1-host-1 hypervisor on the public provider network
+
+```bash
+openstack port create --security-group sg-testing --network public vm1-port
+openstack server create --flavor m1.nano --nic port-id=$(openstack port list | grep vm1-port | awk {'print $2'}) --availability-zone nova:rack-1-host-1 --image cirros-0.6.2-x86_64-disk vm1-provider
+```
+
+* Build a vm on rack-1-host-2 hypervisor on the public provider network
+
+```bash
+openstack port create --security-group sg-testing --network public vm2-port
+openstack server create --flavor m1.nano --nic port-id=$(openstack port list | grep vm2-port | awk {'print $2'}) --availability-zone nova:rack-1-host-2 --image cirros-0.6.2-x86_64-disk vm2-provider
+```
+
+## Common installation problems
+
+### Error: TLS is not enabled
+
+The configure-cumulus playbook should properly disable TLS requirement for ovn-bgp-agent.  If you still get an error you may need to manually disable it and re-run stack.sh.  Look at the task in the playbook to see how to disable TLS for ovn-bgp-agent.
+
+### RTNETLINK answers: Permission denied aka make sure IPv6 is enabled
+
+The generic/ubuntu2204 Vagrant box has ipv6 disabled.  Devstack relies on IPv6 being enabled.  The configure-cumulus ansible playbook has a task that updates the vm to enable ipv6.  If IPv6 is disabled you will get a confusing permission denied error when the stack.sh script attempts to apply an IPv6 address to the br-ex bridge:
+
+```text
++lib/neutron_plugins/services/l3:_neutron_configure_router_v6:416  sudo ip -6 addr replace 2001:db8::2/64 dev br-ex
+RTNETLINK answers: Permission denied
+```
+
+You can check if ipv6 is enabled by running:
+
+```bash
+sysctl -a 2>/dev/null | grep disable_ipv6
+```
+
+If ipv6 is disabled you will see values of "1" for the output above, like this:
+
+```bash
+vagrant@rack-1-host-1:~$ sysctl -a 2>/dev/null | grep disable_ipv6
+net.ipv6.conf.all.disable_ipv6 = 1
+net.ipv6.conf.br-ex.disable_ipv6 = 1
+net.ipv6.conf.br-int.disable_ipv6 = 1
+net.ipv6.conf.default.disable_ipv6 = 1
+net.ipv6.conf.eth1.disable_ipv6 = 1
+net.ipv6.conf.eth2.disable_ipv6 = 1
+net.ipv6.conf.lo.disable_ipv6 = 1
+net.ipv6.conf.ovs-system.disable_ipv6 = 1
+net.ipv6.conf.vagrant.disable_ipv6 = 1
+net.ipv6.conf.virbr0.disable_ipv6 = 1
+```
+
+You can temporarily fix this manually via the following.  Note that this method will NOT survive a restart of the vagrant vm:
+
+```bash
+sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
+```
+
+### Remove a compute node
+
+Once a compute node registers with the controller, you can no longer just unstack.sh or even clean.sh to rebuilt the compute node.  If you do need to re-stack, perhaps to enable a plugin, you have to first remove the existing references from the controller node.  This [guide from Mirantis](https://docs.mirantis.com/mcp/q4-18/mcp-operations-guide/openstack-operations/manage-compute-nodes/remove-compute-node.html#:~:text=To%20remove%20a%20compute%20node%3A&text=Log%20in%20to%20an%20OpenStack%20controller%20node.&text=The%20command%20output%20should%20display,perform%20live%20or%20cold%20migration) is helpful
+
+```bash
+sudo openstack --os-cloud devstack-admin --os-region RegionOne compute service list
+sudo openstack --os-cloud devstack-admin --os-region RegionOne compute service delete <id>
+```
+
+Note that i had to add the --os-cloud devstack-admin to the token request to get some sort of admin token or else my GET requests to the provider endpoint always got a 403
+
+```bash
+sudo openstack --os-cloud devstack-admin token issue -c id -f value
+
+curl -i -X GET <placement-endpoint-address>/resource_providers?name=<target-compute-host-name> -H \
+'content-type: application/json' -H 'X-Auth-Token: <token>'
+
+curl -i -X DELETE <placement-endpoint-address>/resource_providers/<target-compute-node-uuid> -H \
+'content-type: application/json' -H 'X-Auth-Token: <token>'
+```
+
+Fwiw, my controller node had a response from the resource_provider curl GET call, but my compute node did not
+
+## Common operational problems
+
+### Viewing Logs
+
+#### Use journalctl to view ovn-bgp-agent logs
+
+```bash
+sudo journalctl -u devstack@ovn-bgp-agent
+```
+
+#### openstack plugin logs, e.g. neutron, nova-compute, etc
+
+These logs can be found in /var/log/syslog.  There does not appear to be a way to use a journalctl unit to view them individually
+
+#### ovn-controller, ovsdb, NB DB, SB DB, stack.sh logs
+
+These are all written to files in /opt/stack/logs/
 
 ### Geneve tunnel does not come up
 
@@ -269,12 +404,6 @@ Use tcpdump to make sure the iptables SNAT rule is working as expected.
 `sudo tcpdump -nn -i eth1 geneve`
 
 You should see geneve packets being set using the loopback addresses.  If the SNAT is not working you will see geneve packets sourced from one of the BGP p2p interface addresses.
-
-## Common installation problems
-
-### Error: TLS is not enabled
-
-The configure-cumulus playbook should properly disable TLS requirement for ovn-bgp-agent.  If you still get an error you may need to manually disable it and re-run stack.sh.  Look at the task in the playbook to see how to disable TLS for ovn-bgp-agent.
 
 ### Ansible gets a timeout when trying to connect to a vagrant virtual machine
 
@@ -293,42 +422,50 @@ sudo ip link set br-int up
 
 This means there is a connectivity issue trying to reach the controller node hosting the OVN SB DB.  Check your routing/firewall
 
-### RTNETLINK answers: Permission denied aka make sure IPv6 is enabled
+### VMs on same network, but different hypervisors cannot communicate
 
-The generic/ubuntu2204 Vagrant box has ipv6 disabled.  Devstack relies on IPv6 being enabled.  The configure-cumulus ansible playbook has a task that updates the vm to enable ipv6.  If IPv6 is disabled you will get a confusing permission denied error when the stack.sh script attempts to apply an IPv6 address to the br-ex bridge:
+By default OpenStack assumes everything is L2 adjacent.  Therefore it assumes that when two VMs are on the same subnet, but different hypervisors it just needs to send the packets out the provider bridge, br-ex which sends on to the upstream switching layer via physical server ports.  But when using the ovn-bgp-agent setup, br-ex does not get assigned any physical interfaces.  Instead it needs to hand packets off to kernel routing for them to be delivered.  Part of the glue that makes this work is a flow rule that ovn-bgp-agent daemon creates for br-ex that causes it to re-write the destnation MAC address from any packet it receives from the integration-bridge (br-int) with the MAC address of the provider bridge.  This causes the provider bridge to hand off the packet to the kernel which will then forward it using one of the ECMP BGP routes.
 
-```text
-+lib/neutron_plugins/services/l3:_neutron_configure_router_v6:416  sudo ip -6 addr replace 2001:db8::2/64 dev br-ex
-RTNETLINK answers: Permission denied
+If this flow is missing on either hypervisor, the packet does not get delivered.
+
+If you find that the flows are missing, you can test connectivity by manually adding the flows to each hypervisor.
+
+* Discover the MAC address of br-ex
+
+```bash
+vagrant@rack-1-host-1:/opt/stack/devstack$ ip link show br-ex
+8: br-ex: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UNKNOWN mode DEFAULT group default qlen 1000
+    link/ether 5e:b7:7b:db:61:43 brd ff:ff:ff:ff:ff:ff
 ```
 
-You can check if ipv6 is enabled by running:
+* Discover the name of the patch that connects br-ex to br-int
 
-```text
-sysctl -a 2>/dev/null | grep disable_ipv6
+```bash
+vagrant@rack-1-host-1:/opt/stack/devstack$ sudo ovs-vsctl show
+<snip>
+    Bridge br-ex
+        Port br-ex
+            Interface br-ex
+                type: internal
+        Port patch-provnet-23731af5-e966-4e75-8b41-0dc2e941c633-to-br-int
+            Interface patch-provnet-23731af5-e966-4e75-8b41-0dc2e941c633-to-br-int
+                type: patch
+                options: {peer=patch-br-int-to-provnet-23731af5-e966-4e75-8b41-0dc2e941c633}
 ```
 
-If ipv6 is disabled you will see values of "1" for the output above, like this:
+You appear to only need the first number after the patch name, e.g. patch-provnet-2
 
-```text
-vagrant@rack-1-host-1:~$ sysctl -a 2>/dev/null | grep disable_ipv6
-net.ipv6.conf.all.disable_ipv6 = 1
-net.ipv6.conf.br-ex.disable_ipv6 = 1
-net.ipv6.conf.br-int.disable_ipv6 = 1
-net.ipv6.conf.default.disable_ipv6 = 1
-net.ipv6.conf.eth1.disable_ipv6 = 1
-net.ipv6.conf.eth2.disable_ipv6 = 1
-net.ipv6.conf.lo.disable_ipv6 = 1
-net.ipv6.conf.ovs-system.disable_ipv6 = 1
-net.ipv6.conf.vagrant.disable_ipv6 = 1
-net.ipv6.conf.virbr0.disable_ipv6 = 1
+* Add the missing flow to br-ex
+
+```bash
+vagrant@rack-1-host-1:/opt/stack/devstack$ sudo ovs-ofctl --protocols=OpenFlow13 add-flow br-ex ip,priority=900,in_port="patch-provnet-2",actions=mod_dl_dst:5e:b7:7b:db:61:43,NORMAL
 ```
 
-You can temporarily fix this manually via the following.  Note that this method will NOT survive a restart of the vagrant vm:
+* Repeat process for the other hypervisor
 
-`
-sudo sysctl -w net.ipv6.conf.all.disable_ipv6=0
-`
+Now your vms should be able to communicate with each other.  Note that in my experience, despite the man pages indicating that manually added flows have an infinite idle timeout I have found that the flows will timeout and disappear if not traffic is traversing them for some relatively small amount of time; a few minutes.  
+
+As ovn-bgp-agent is meant to be adding these flows you should examine the ovn-bgp-agent logs for any errors.
 
 ## Using SSH port forwarding to Access Horizon
 
@@ -341,14 +478,20 @@ One way is to start two separate ssh tunnels, the first from your local client t
 By default Horizon listens on HTTP port 80.  We will listen locally on port 8080 and forward that on.
 
 From client to base server:
-ssh -L8080:localhost:8080 user@base-server
+
+```bash
+ssh -L8443:localhost:8443 user@base-server
+```
 
 From base server to vagrant vm hosting Horizon:
-ssh -L 8080:localhost:80 vagrant@10.255.1.233 -i ~/ovn-bgp-vagrants/spine-leaf-test/.vagrant/machines/rack-1-host-1/libvirt/private_key
+
+```bash
+ssh -L 8443:localhost:80 vagrant@<vagrant vm IP> -i ~/ovn-bgp-vagrants/spine-leaf-test/.vagrant/machines/rack-1-host-1/libvirt/private_key
+```
 
 Note: I'm not sure there is a good way to do this in one command with the -J flag or defining it in your ssh conf file because you then would need the vagrant machine private key local to your client server and this can change if you rebuild your vagrant vm.
 
-Now in your browser on your local client you should be able to go to http://<ip or FQDN of base server>:8080/dashboard
+Now in your browser on your local client you should be able browse to the [Horizon portal](https://localhost:8443/dashboard)
 
 ## How to get TLS working on a multi-node devstack installation
 
@@ -400,37 +543,38 @@ The blog guide runs into trouble installing Devstack on centos8.  The Openstack 
 
 I am attempting to get the hosts working with ubuntu.  The first issue I ran into is trying to use box vagrant/jammy64.  This was because that box doesn't support the provider libvirt.  Next i found generic/ubuntu2204.  Unfortunately this box does not work either- at least when running Vagrant 2.6. The box would download and attept to start it's config process, but reach a point where vagrant is trying to ssh into the box and fail.  this appears due to the version of vagrant that was installed on my host system which is running Ubuntu 20.04.  The packaged vagrant version included with 20.04 is 2.2.6 which doesn't support generic/ubuntu2204 because Vagrant 2.2.6 relies on RSA keys and the version of OpenSSH included with 22.04 disables them by default.  This is described [here|https://github.com/hashicorp/vagrant/pull/13179] .  Workarounds include manually installing a supported version of Vagrant, or changing my box to use Ubuntu 20.04 instead of 22.04.  for now I am choosing to use 20.04
 
-
 * This is required for installs on Ubuntu
 
-`
+```bash
 sudo apt install python3.8-distutils
-`
+```
 
 * I ran the install_devstack master script from the blog which failed, but did produce an edited version of local.conf .  Following the Devstack wiki I cloned the Devstack repo.  Instead of hand editing a new local.conf, i just copied over the one that ahd been previously generated and ran the stack.sh script.  This errored out because it claimed it had not been tested on ubuntu Focal (20.04) and that if I wanted to continue I had to set the Force env var
 
-`
+```bash
 export FORCE=yes
-`
+```
 
 * Ubuntu 20.04 has some sort of TLS issue with either git or the curl library version git relies on.  If you run the stack.sh script vanilla you will run into errors like:
 
-`+functions-common:git_timed:688            timeout -s SIGINT 0 git clone --no-checkout https://opendev.org/openstack/neutron.git /opt/stack/neutron
+```text
++functions-common:git_timed:688            timeout -s SIGINT 0 git clone --no-checkout https://opendev.org/openstack/neutron.git /opt/stack/neutron
 Cloning into '/opt/stack/neutron'...
 error: RPC failed; curl 56 GnuTLS recv error (-54): Error in the pull function.
 fatal: the remote end hung up unexpectedly
 fatal: early EOF
-fatal: index-pack failed`
+fatal: index-pack failed
+```
 
 Strangely, you can often avoid these errors by turning on a debug flag for git.  so run the command like so:
 
-`
+```bash
 GIT_CURL_VERBOSE=1 ./stack.sh
-`
+```
 
 or for repated failures, turn off ssl verification (yuck):
 
-`
+```bash
 git config --global http.sslVerify false
 git config --global http.postBuffer 1048576000
-`
+```
