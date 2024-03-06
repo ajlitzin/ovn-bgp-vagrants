@@ -183,6 +183,18 @@
       ansible.builtin.command: netplan apply
       when: ansible_distribution == "Ubuntu"
 
+    - name: Apply iptables SNAT rule for r-1-h-1 loopback to r-1-h-2
+      tags: andy
+      ansible.builtin.iptables:
+        table: nat
+        chain: POSTROUTING
+        out_interface: eth1
+        destination: "{{ hostvars['rack-1-host-2']['dummy0_ipv4'] | ansible.utils.ipaddr('network') }}"
+        protocol: all
+        jump: SNAT
+        to_source: "{{ dummy0_ipv4 | ansible.utils.ipaddr('network') }}"
+      when: inventory_hostname == 'rack-1-host-1'
+
     - name: Create dir for devstack installation
       ansible.builtin.file:
         owner: vagrant
